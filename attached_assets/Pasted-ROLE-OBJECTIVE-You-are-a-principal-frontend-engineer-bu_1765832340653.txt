@@ -1,0 +1,329 @@
+ROLE & OBJECTIVE
+
+You are a principal frontend engineer building a production-quality MVP for an enterprise, SQL-agnostic data grid engine.
+
+This MVP must:
+
+Fully satisfy all client requirements
+
+Demonstrate correct virtualization, editing, caching, permissions, and persistence
+
+Present a clean, professional UI suitable for stakeholder demos and video recordings
+
+Be architected for long-term extensibility (dashboards, charts, plugins)
+
+This is a presentable product demo, not a throwaway proof of concept.
+
+TECH STACK
+
+React + TypeScript
+
+Vite
+
+@tanstack/table v8
+
+@tanstack/react-virtual
+
+@tanstack/query
+
+Zustand (or equivalent) for UI state
+
+Tailwind CSS for styling
+
+Headless UI / Radix UI for accessible components
+
+Recharts (for Phase 2 readiness)
+
+Mock backend simulating SQL responses
+
+UI / UX REQUIREMENTS (IMPORTANT)
+
+Design a professional enterprise UI, similar to:
+
+Admin dashboards
+
+Data platforms (Snowflake, Superset, Retool, Airtable-like polish)
+
+UI guidelines:
+
+Sticky header with grid title & toolbar
+
+Toolbar actions: refresh, reset layout, toggle columns
+
+Subtle borders, spacing, hover states
+
+Consistent typography
+
+Loading skeletons (not spinners)
+
+No layout flicker on restore
+
+Clear visual distinction for:
+
+Editable cells
+
+Read-only cells
+
+Validation errors
+
+Optimistic updates
+
+CORE FUNCTIONAL REQUIREMENTS
+1. Universal SQL-Driven Data Loader
+
+Implement a universal data loader that accepts arbitrary SQL-like results:
+
+{
+  primaryKey: string
+  columns: {
+    id: string
+    label: string
+    type: 'string' | 'number' | 'date' | 'boolean'
+    nullable?: boolean
+  }[]
+  rows: Record<string, any>[]
+}
+
+
+Requirements:
+
+Grid contains no business logic
+
+Any SQL result works automatically
+
+Sorting, filtering, pagination, and virtualization handled generically
+
+Swapping datasets requires only a column config file
+
+2. Virtualization + Pinning (Enterprise Grade)
+
+Implement:
+
+Vertical + horizontal virtualization
+
+Left & right pinned columns
+
+Sticky header row
+
+10,000+ mock rows
+
+UI Expectations:
+
+Pinned columns have subtle shadow
+
+No jitter or misalignment
+
+Smooth scroll performance
+
+3. Inline Editing in Virtualized Rows
+
+Implement inline editing with:
+
+Controlled editors inside cells
+
+Edit state stored outside row components
+
+Edits persist during scroll (unmount/remount)
+
+Optimistic updates using TanStack Query
+
+Visual “saving” and “error” states
+
+Rollback on failure
+
+4. Caching Architecture (Documented in Code)
+
+Use TanStack Query to implement:
+
+Query-level caching
+
+keepPreviousData
+
+Stable row identity via primary key
+
+Partial invalidation after edits
+
+Add inline comments explaining:
+
+Cache granularity choice
+
+How stale data is avoided
+
+How identity stability is preserved
+
+5. Fully Config-Driven Editing & Validation
+
+All editing logic must come from column config:
+
+{
+  editable: boolean
+  editorType: 'text' | 'number' | 'date' | 'select' | 'boolean'
+  validator?: (value) => string | null
+}
+
+
+No per-grid logic allowed.
+
+UI:
+
+Inline validation messages
+
+Disabled editors for read-only columns
+
+6. Complete Column Configuration System
+
+Column config must control:
+
+Editable vs read-only
+
+Editor types
+
+Custom renderers
+
+Sort & filter types
+
+Default & minimum widths
+
+Pinning (left/right/top)
+
+Resize behavior
+
+All behaviors must be config-driven.
+
+7. User State Persistence (No Flicker)
+
+Persist & restore:
+
+Column order
+
+Visibility
+
+Widths
+
+Pinning
+
+Sorting (multi-sort)
+
+Filters
+
+Scroll position (best effort)
+
+Requirements:
+
+Keyed by userId + gridId
+
+Stored in localStorage (mock backend optional)
+
+State restored before render to avoid flicker
+
+“Reset layout” button in UI
+
+8. Permissions-Based Visibility & Editing
+
+Implement permission support where:
+
+Column config declares required permissions
+
+Columns can be hidden or read-only
+
+Permissions enforced at UI & logic layers
+
+Permissions can change at runtime
+
+Hidden columns optionally excluded from fetch
+
+UI:
+
+Role switcher (Admin / Editor / Viewer)
+
+9. Saved State + Permissions Self-Healing
+
+If saved layout contains forbidden columns:
+
+Automatically remove them
+
+Recalculate layout
+
+Never crash or render blank grid
+
+Explain logic in comments.
+
+10. Extensible Plugin Architecture
+
+Design grid engine to support plugins:
+
+Examples:
+
+Conditional formatting
+
+Calculated columns
+
+Row-level permissions
+
+Custom toolbar actions
+
+Bulk editing
+
+Drag-and-drop ordering
+
+Use:
+
+Plugin hooks
+
+Middleware-style extensions
+
+Zero core rewrites
+
+11. Phase 2 Readiness – Charts & Dashboards
+
+Add a dashboard page:
+
+Grid + Recharts visualization
+
+Shared filters & sorting
+
+Chart → grid drilldown
+
+Grid → chart interaction
+
+Architecture:
+
+Shared universal data loader
+
+Clear separation of data vs UI logic
+
+Explain in comments why Phase 1 doesn’t limit Phase 2.
+
+DELIVERABLE EXPECTATIONS
+
+Produce:
+
+A clean, navigable app
+
+Modular folder structure
+
+Thoughtful inline comments
+
+Mock APIs with latency & error simulation
+
+UI suitable for screen recording
+
+Avoid:
+
+Dataset-specific hacks
+
+Hardcoded logic
+
+Over-styling
+
+SUCCESS CRITERIA
+
+This MVP should clearly demonstrate:
+
+Enterprise-grade architecture
+
+Visual polish suitable for stakeholders
+
+Long-term scalability
+
+Confidence in delivery
