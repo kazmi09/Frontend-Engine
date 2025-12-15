@@ -75,12 +75,23 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
+  // Bulk insert in batches to avoid stack overflow
   async bulkCreateEmployees(employeeList: InsertEmployee[]): Promise<Employee[]> {
     if (employeeList.length === 0) return [];
-    return await db
-      .insert(employees)
-      .values(employeeList)
-      .returning();
+    
+    const BATCH_SIZE = 100; // Insert 100 records at a time
+    const results: Employee[] = [];
+    
+    for (let i = 0; i < employeeList.length; i += BATCH_SIZE) {
+      const batch = employeeList.slice(i, i + BATCH_SIZE);
+      const inserted = await db
+        .insert(employees)
+        .values(batch)
+        .returning();
+      results.push(...inserted);
+    }
+    
+    return results;
   }
 
   // Optimized single-field update for inline editing
