@@ -1,14 +1,39 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DataGrid } from "@/components/grid/DataGrid";
 import { GridToolbar } from "@/components/grid/GridToolbar";
-import { fetchMockData } from "@/lib/mock/data";
+import { employeeApi } from "@/lib/api/employees";
+import { Button } from "@/components/ui/button";
+import { Database } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
+  
   const { data, isLoading, isRefetching, refetch } = useQuery({
     queryKey: ["grid-data"],
-    queryFn: fetchMockData,
+    queryFn: employeeApi.getAll,
     staleTime: 60000, // 1 min cache
   });
+
+  const seedMutation = useMutation({
+    mutationFn: () => employeeApi.seed(10000),
+    onSuccess: (result) => {
+      toast({
+        title: "Database Seeded",
+        description: `Successfully created ${result.count} employee records`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["grid-data"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Seed Failed",
+        description: error.message || "Failed to seed database",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const showSeedButton = data?.rows.length === 0 && !isLoading;
 
   return (
     <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-neutral-950 overflow-hidden">
@@ -28,16 +53,33 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
-         <div className="flex-1 flex flex-col bg-white dark:bg-neutral-900 border rounded-lg shadow-sm overflow-hidden min-h-0">
-            <GridToolbar 
-              onRefresh={() => refetch()} 
-              isRefetching={isRefetching}
-              data={data}
-            />
-            <div className="flex-1 overflow-hidden min-h-0">
-               <DataGrid data={data!} isLoading={isLoading} />
-            </div>
-         </div>
+         {showSeedButton ? (
+           <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-neutral-900 border rounded-lg shadow-sm">
+             <Database className="w-16 h-16 text-muted-foreground mb-4" />
+             <h2 className="text-2xl font-semibold mb-2">Database is Empty</h2>
+             <p className="text-muted-foreground mb-6 text-center max-w-md">
+               Start by seeding the database with sample employee records to see the grid in action.
+             </p>
+             <Button 
+               onClick={() => seedMutation.mutate()}
+               disabled={seedMutation.isPending}
+               size="lg"
+             >
+               {seedMutation.isPending ? "Seeding..." : "Seed 10,000 Records"}
+             </Button>
+           </div>
+         ) : (
+           <div className="flex-1 flex flex-col bg-white dark:bg-neutral-900 border rounded-lg shadow-sm overflow-hidden min-h-0">
+              <GridToolbar 
+                onRefresh={() => refetch()} 
+                isRefetching={isRefetching}
+                data={data}
+              />
+              <div className="flex-1 overflow-hidden min-h-0">
+                 <DataGrid data={data!} isLoading={isLoading} />
+              </div>
+           </div>
+         )}
       </main>
     </div>
   );

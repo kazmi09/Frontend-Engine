@@ -1,18 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ColumnConfig } from "@/lib/grid/types";
 import { useGridUpdate } from "@/lib/grid/hooks";
 import { useAuthStore } from "@/lib/auth/store";
-import { AlertCircle } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { AlertCircle, Check, X } from "lucide-react";
 
 interface EditableCellProps {
   value: any;
@@ -55,9 +46,6 @@ export const EditableCell = ({ value: initialValue, rowId, column, width }: Edit
     const validationError = validate(value);
     if (validationError) {
       setError(validationError);
-      // Keep editing if error? Or show error state?
-      // Requirement says "Visual 'saving' and 'error' states"
-      // We'll keep editing active but show error
       return; 
     }
     
@@ -85,8 +73,13 @@ export const EditableCell = ({ value: initialValue, rowId, column, width }: Edit
   if (!isEditable) {
      if (column.type === "boolean") {
          return (
-             <div className="flex items-center justify-center h-full w-full opacity-60">
-                 <Checkbox checked={!!value} disabled />
+             <div className="flex items-center justify-center h-full w-full px-3 py-1.5">
+                 <div className={cn(
+                   "w-4 h-4 rounded border flex items-center justify-center opacity-60",
+                   !!value ? "bg-slate-300 border-slate-400" : "border-slate-300"
+                 )}>
+                   {!!value && <Check className="w-3 h-3 text-slate-600" />}
+                 </div>
              </div>
          )
      }
@@ -100,14 +93,20 @@ export const EditableCell = ({ value: initialValue, rowId, column, width }: Edit
   // Boolean is always "live" (toggle immediately)
   if (column.type === "boolean") {
     return (
-      <div className="flex items-center justify-center h-full w-full">
-        <Checkbox 
-          checked={!!value} 
-          onCheckedChange={(checked) => {
-             setValue(checked);
-             updateMutation.mutate({ rowId, columnId: column.id, value: checked });
-          }}
-        />
+      <div 
+        className="flex items-center justify-center h-full w-full cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 px-3 py-1.5"
+        onClick={() => {
+          const newValue = !value;
+          setValue(newValue);
+          updateMutation.mutate({ rowId, columnId: column.id, value: newValue });
+        }}
+      >
+        <div className={cn(
+          "w-4 h-4 rounded border-2 flex items-center justify-center transition-all",
+          value ? "bg-primary border-primary" : "border-input"
+        )}>
+          {value && <Check className="w-3 h-3 text-primary-foreground" />}
+        </div>
       </div>
     );
   }
@@ -141,7 +140,7 @@ export const EditableCell = ({ value: initialValue, rowId, column, width }: Edit
           onChange={(e) => {
              const val = column.type === "number" ? Number(e.target.value) : e.target.value;
              setValue(val);
-             if (error) setError(validate(val)); // Clear error on change if valid
+             if (error) setError(validate(val));
           }}
           onBlur={onCommit}
           onKeyDown={onKeyDown}
@@ -166,11 +165,6 @@ export const EditableCell = ({ value: initialValue, rowId, column, width }: Edit
       onClick={() => setIsEditing(true)}
     >
         {column.type === "date" && value ? new Date(value).toLocaleDateString() : String(value ?? "")}
-        
-        {/* Edit Pencil Icon (Subtle) */}
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 transition-opacity">
-           {/* We could add an icon here if desired */}
-        </div>
     </div>
   );
 };
