@@ -41,7 +41,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    host: "0.0.0.0",
+    host: process.platform === "win32" ? "localhost" : "0.0.0.0",
     allowedHosts: true,
     fs: {
       strict: true,
