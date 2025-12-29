@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertEmployeeSchema, updateEmployeeSchema } from "@shared/schema";
 import { z } from "zod";
+import { queryMySQL } from "./mysql-db";
 
 const DEPARTMENTS = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Legal", "Product"];
 const STATUSES = ["Active", "Inactive", "Pending", "Archived"];
@@ -230,6 +231,427 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error seeding data:", error);
       res.status(500).json({ error: "Failed to seed data" });
+    }
+  });
+
+  // local employee code
+  app.get("/api/employees_local", async (req, res) => {
+    try {
+      // Check if DATABASE_URL is set
+      if (!process.env.DATABASE_URL) {
+        console.error("[API] DATABASE_URL is not set");
+        return res.status(500).json({ 
+          error: "Database configuration error", 
+          message: "DATABASE_URL environment variable is not set. Please set it to: mysql+mysqlconnector://root:DesiDrop%40123@localhost/desi_drop_beta"
+        });
+      }
+
+      console.log("[API] Fetching orders from MySQL...");
+      
+      const query = `
+        select employee_id,
+        first_name,last_name,
+        email,
+        department,
+        job_title,
+        salary,
+        hire_date 
+      from employees_temp
+    order by employee_id desc
+      `;
+
+      const rows = await queryMySQL<any>(query);
+      console.log(`[API] Successfully fetched ${rows.length} orders`);
+
+      // Transform to match frontend DataResult format
+      const result = {
+        primaryKey: "id",
+        columns: [
+          { 
+            id: "employee_id", 
+            label: "Employee ID", 
+            type: "number", 
+            width: 120, 
+            pinned: "left", 
+            editable: false 
+          },
+          { 
+            id: "first_name", 
+            label: "First Name", 
+            type: "string", 
+            width: 200, 
+            editable: true 
+          },
+          { 
+            id: "last_name", 
+            label: "Last Name", 
+            type: "string", 
+            width: 150, 
+            editable: true 
+          },
+          { 
+            id: "email", 
+            label: "Email", 
+            type: "string", 
+            width: 300, 
+            editable: true 
+          },
+          { 
+            id: "department", 
+            label: "Department", 
+            type: "number", 
+            width: 140, 
+            editable: true 
+          },
+          { 
+            id: "job_title", 
+            label: "Job Title", 
+            type: "string", 
+            width: 150, 
+            editable: true 
+          },
+          { 
+            id: "salary", 
+            label: "Salary", 
+            type: "string", 
+            width: 250, 
+            editable: true 
+          },
+          { 
+            id: "hire_date", 
+            label: "Hire Date", 
+            type: "date", 
+            width: 150, 
+            editable: true 
+          },
+        ],
+        rows: rows.map((row, index) => ({
+          id: `${row.employee_id}-${index}`, // Create unique ID from order_id and index
+          employee_id: row.employee_id,
+          first_name: row.first_name || "",
+          last_name: row.last_name || "",
+          email: row.email || "",
+          department: row.department || "", // Convert string to number
+          job_title: row.job_title || "",
+          salary: row.salary || "",
+          hire_date: row.hire_date || "",
+        }))
+      };
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[API] Error fetching orders:", error);
+      console.error("[API] Error stack:", error.stack);
+      
+      // Provide more detailed error information
+      const errorMessage = error.message || "Database connection error";
+      const isConnectionError = errorMessage.includes("ECONNREFUSED") || 
+                                errorMessage.includes("ER_ACCESS_DENIED") ||
+                                errorMessage.includes("ENOTFOUND") ||
+                                errorMessage.includes("ETIMEDOUT");
+      
+      res.status(500).json({ 
+        error: "Failed to fetch orders", 
+        message: errorMessage,
+        details: isConnectionError 
+          ? "Please check: 1) MySQL server is running, 2) Database credentials are correct, 3) Database 'desi_drop_beta' exists"
+          : undefined
+      });
+    }
+  });
+
+  // Update a single order field (optimized for inline editing)
+  app.patch("/api/employee_local/:id/field", async (req, res) => {
+    try {
+      const { id } = req.params; // Format: "order_id-index"
+      const { field, value } = req.body;
+      
+      if (!field || value === undefined) {
+        return res.status(400).json({ error: "Field and value are required" });
+      }
+
+      // Parse the ID to get order_id (format: "order_id-index")
+      const orderId = id.split("-")[0];
+      
+      // Determine which table to update based on the field
+      let updateQuery = "";
+      let params: any[] = [];
+
+      switch (field) {
+        case "first_name":
+        case "last_name":
+        case "email":
+        case "department":  
+          // Update customer details - need to get customer_id from order first
+          updateQuery = `UPDATE employees_temp SET ${field} = ? WHERE employee_id = ?`;
+          params = [value,orderId];
+          break;
+
+      
+        default:
+          return res.status(400).json({ error: `Field '${field}' is not editable` });
+      }
+
+      // Execute the update
+      await queryMySQL(updateQuery, params);
+      
+      console.log(`[API] Updated order field: ${field} for order ${orderId}`);
+
+      // Return success response
+      res.json({ 
+        success: true, 
+        message: `Updated ${field} successfully`,
+        orderId,
+        field,
+        value
+      });
+    } catch (error: any) {
+      console.error("[API] Error updating order field:", error);
+      res.status(500).json({ 
+        error: "Failed to update order", 
+        message: error.message || "Database error"
+      });
+    }
+  });
+
+
+  // Get orders from MySQL database
+  app.get("/api/orders", async (req, res) => {
+    try {
+      // Check if DATABASE_URL is set
+      if (!process.env.DATABASE_URL) {
+        console.error("[API] DATABASE_URL is not set");
+        return res.status(500).json({ 
+          error: "Database configuration error", 
+          message: "DATABASE_URL environment variable is not set. Please set it to: mysql+mysqlconnector://root:DesiDrop%40123@localhost/desi_drop_beta"
+        });
+      }
+
+      console.log("[API] Fetching orders from MySQL...");
+      
+      const query = `
+        SELECT 
+          tcd.customer_name,
+          tcd.customer_contact,
+          tto.pk_id as order_id,
+          tto.delivery_address as delivery_address,
+          tto.total_amount,
+          ttod.item_type,
+          ttod.item_name
+        FROM tbl_trans_order tto
+        JOIN tbl_trans_order_details ttod ON ttod.fk_order_id = tto.pk_id
+        JOIN tbl_customer_details tcd ON tcd.pk_id = tto.fk_customer_id
+        ORDER BY ttod.pk_id DESC
+      `;
+
+      const rows = await queryMySQL<any>(query);
+      console.log(`[API] Successfully fetched ${rows.length} orders`);
+
+      // Transform to match frontend DataResult format
+      const result = {
+        primaryKey: "id",
+        columns: [
+          { 
+            id: "order_id", 
+            label: "Order ID", 
+            type: "number", 
+            width: 120, 
+            pinned: "left", 
+            editable: false 
+          },
+          { 
+            id: "customer_name", 
+            label: "Customer Name", 
+            type: "string", 
+            width: 200, 
+            editable: true 
+          },
+          { 
+            id: "customer_contact", 
+            label: "Customer Contact", 
+            type: "string", 
+            width: 150, 
+            editable: true 
+          },
+          { 
+            id: "delivery_address", 
+            label: "Delivery Address", 
+            type: "string", 
+            width: 300, 
+            editable: true 
+          },
+          { 
+            id: "total_amount", 
+            label: "Total Amount", 
+            type: "number", 
+            width: 140, 
+            editable: true 
+          },
+          { 
+            id: "item_type", 
+            label: "Item Type", 
+            type: "string", 
+            width: 150, 
+            editable: true 
+          },
+          { 
+            id: "item_name", 
+            label: "Item Name", 
+            type: "string", 
+            width: 250, 
+            editable: true 
+          },
+        ],
+        rows: rows.map((row, index) => ({
+          id: `${row.order_id}-${index}`, // Create unique ID from order_id and index
+          order_id: row.order_id,
+          customer_name: row.customer_name || "",
+          customer_contact: row.customer_contact || "",
+          delivery_address: row.delivery_address || "",
+          total_amount: parseFloat(row.total_amount) || 0, // Convert string to number
+          item_type: row.item_type || "",
+          item_name: row.item_name || "",
+        }))
+      };
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("[API] Error fetching orders:", error);
+      console.error("[API] Error stack:", error.stack);
+      
+      // Provide more detailed error information
+      const errorMessage = error.message || "Database connection error";
+      const isConnectionError = errorMessage.includes("ECONNREFUSED") || 
+                                errorMessage.includes("ER_ACCESS_DENIED") ||
+                                errorMessage.includes("ENOTFOUND") ||
+                                errorMessage.includes("ETIMEDOUT");
+      
+      res.status(500).json({ 
+        error: "Failed to fetch orders", 
+        message: errorMessage,
+        details: isConnectionError 
+          ? "Please check: 1) MySQL server is running, 2) Database credentials are correct, 3) Database 'desi_drop_beta' exists"
+          : undefined
+      });
+    }
+  });
+
+  // Update a single order field (optimized for inline editing)
+  app.patch("/api/orders/:id/field", async (req, res) => {
+    try {
+      const { id } = req.params; // Format: "order_id-index"
+      const { field, value } = req.body;
+      
+      if (!field || value === undefined) {
+        return res.status(400).json({ error: "Field and value are required" });
+      }
+
+      // Parse the ID to get order_id (format: "order_id-index")
+      const orderId = id.split("-")[0];
+      
+      // Determine which table to update based on the field
+      let updateQuery = "";
+      let params: any[] = [];
+
+      switch (field) {
+        case "customer_name":
+        case "customer_contact":
+          // Update customer details - need to get customer_id from order first
+          const customerQuery = `SELECT fk_customer_id FROM tbl_trans_order WHERE pk_id = ?`;
+          const customerRows = await queryMySQL<any>(customerQuery, [orderId]);
+          
+          if (!customerRows || customerRows.length === 0) {
+            return res.status(404).json({ error: "Order not found" });
+          }
+          
+          const customerId = customerRows[0].fk_customer_id;
+          const customerField = field === "customer_name" ? "customer_name" : "customer_contact";
+          updateQuery = `UPDATE tbl_customer_details SET ${customerField} = ? WHERE pk_id = ?`;
+          params = [value, customerId];
+          break;
+
+        case "delivery_address":
+        case "total_amount":
+          // Update order table
+          const orderField = field === "delivery_address" ? "delivery_address" : "total_amount";
+          updateQuery = `UPDATE tbl_trans_order SET ${orderField} = ? WHERE pk_id = ?`;
+          params = field === "total_amount" ? [parseFloat(value), orderId] : [value, orderId];
+          break;
+
+        case "item_type":
+        case "item_name":
+          // Update order details - need to get the order_detail_id
+          // Since we have multiple order details per order, we'll update the first one
+          // or we could update all of them. For now, let's update the first one.
+          const detailQuery = `SELECT pk_id FROM tbl_trans_order_details WHERE fk_order_id = ? ORDER BY pk_id DESC LIMIT 1`;
+          const detailRows = await queryMySQL<any>(detailQuery, [orderId]);
+          
+          if (!detailRows || detailRows.length === 0) {
+            return res.status(404).json({ error: "Order detail not found" });
+          }
+          
+          const detailId = detailRows[0].pk_id;
+          const detailField = field === "item_type" ? "item_type" : "item_name";
+          updateQuery = `UPDATE tbl_trans_order_details SET ${detailField} = ? WHERE pk_id = ?`;
+          params = [value, detailId];
+          break;
+
+        default:
+          return res.status(400).json({ error: `Field '${field}' is not editable` });
+      }
+
+      // Execute the update
+      await queryMySQL(updateQuery, params);
+      
+      console.log(`[API] Updated order field: ${field} for order ${orderId}`);
+
+      // Return success response
+      res.json({ 
+        success: true, 
+        message: `Updated ${field} successfully`,
+        orderId,
+        field,
+        value
+      });
+    } catch (error: any) {
+      console.error("[API] Error updating order field:", error);
+      res.status(500).json({ 
+        error: "Failed to update order", 
+        message: error.message || "Database error"
+      });
+    }
+  });
+
+  // Test database connection endpoint
+  app.get("/api/orders/test", async (req, res) => {
+    try {
+      if (!process.env.DATABASE_URL) {
+        return res.status(500).json({ 
+          error: "DATABASE_URL not set",
+          message: "Please set DATABASE_URL in .env file"
+        });
+      }
+
+      const { queryMySQL } = await import("./mysql-db");
+      await queryMySQL("SELECT 1 as test");
+      
+      res.json({ 
+        success: true, 
+        message: "Database connection successful",
+        database: process.env.DATABASE_URL.split("/").pop()?.split("?")[0]
+      });
+    } catch (error: any) {
+      console.error("[API] Connection test failed:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Database connection failed", 
+        message: error.message,
+        details: {
+          code: error.code,
+          errno: error.errno,
+          sqlState: error.sqlState
+        }
+      });
     }
   });
 
