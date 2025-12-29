@@ -1,19 +1,18 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   flexRender,
   ColumnDef,
-  Row,
   SortingState,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { useGridStore } from "@/lib/grid/store";
 import { DataResult, ColumnConfig } from "@/lib/grid/types";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, ChevronsUpDown, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import { EditableCell } from "@/components/grid/cells/EditableCell";
+import { Button } from "@/components/ui/button";
 
 interface DataGridProps {
   data: DataResult;
@@ -24,7 +23,8 @@ export const DataGrid = ({ data, isLoading }: DataGridProps) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const { 
     columnVisibility, columnOrder, columnPinning, columnSizing, sorting,
-    setColumnVisibility, setColumnOrder, setColumnPinning, setColumnSizing, setSorting 
+    setColumnVisibility, setColumnOrder, setColumnPinning, setColumnSizing, setSorting,
+    pageIndex, pageSize, setPageIndex, setPageSize
   } = useGridStore();
 
   // Memoize columns definition from config
@@ -75,13 +75,9 @@ export const DataGrid = ({ data, isLoading }: DataGridProps) => {
 
   const { rows } = table.getRowModel();
 
-  // Virtualizer for Rows
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 35, // 35px row height
-    overscan: 10,
-  });
+  const totalPages = data?.pagination ? Math.ceil(data.pagination.totalRows / data.pagination.pageSize) : 0;
+  const canPreviousPage = pageIndex > 0;
+  const canNextPage = pageIndex < totalPages - 1;
 
   if (isLoading) {
     return (
@@ -149,61 +145,76 @@ export const DataGrid = ({ data, isLoading }: DataGridProps) => {
           </div>
 
           {/* Body */}
-          <div
-            className="relative w-full"
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              return (
-                <div
-                  key={row.id}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  className={cn(
-                    "absolute top-0 left-0 flex w-full border-b transition-colors bg-white dark:bg-neutral-900 group",
-                    virtualRow.index % 2 === 0 ? "bg-white dark:bg-neutral-900" : "bg-slate-50/30 dark:bg-white/[0.02]",
-                    // Row hover only affects background if we aren't editing, but CSS hover is tricky with controlled inputs
-                    // We'll keep it subtle
-                    "hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
-                  )}
-                  style={{
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                     const isPinned = cell.column.getIsPinned();
-                     return (
-                      <div
-                        key={cell.id}
-                        className={cn(
-                          "flex items-center border-r truncate h-[35px] p-0", // Removed padding here, handled in EditableCell
-                          isPinned === "left" && "sticky left-0 z-10 bg-white dark:bg-neutral-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50 border-r-2 border-r-primary/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
-                          isPinned === "right" && "sticky right-0 z-10 bg-white dark:bg-neutral-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50 border-l-2 border-l-primary/10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"
-                        )}
-                        style={{
-                          width: cell.column.getSize(),
-                          left: isPinned === "left" ? `${cell.column.getStart("left")}px` : undefined,
-                          right: isPinned === "right" ? `${cell.column.getAfter("right")}px` : undefined,
-                        }}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+          <div className="w-full">
+            {rows.map((row, index) => (
+              <div
+                key={row.id}
+                className={cn(
+                  "flex w-full border-b transition-colors bg-white dark:bg-neutral-900 group h-[35px]",
+                  index % 2 === 0 ? "bg-white dark:bg-neutral-900" : "bg-slate-50/30 dark:bg-white/[0.02]",
+                  "hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
+                )}
+              >
+                {row.getVisibleCells().map((cell) => {
+                   const isPinned = cell.column.getIsPinned();
+                   return (
+                    <div
+                      key={cell.id}
+                      className={cn(
+                        "flex items-center border-r truncate p-0",
+                        isPinned === "left" && "sticky left-0 z-10 bg-white dark:bg-neutral-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50 border-r-2 border-r-primary/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]",
+                        isPinned === "right" && "sticky right-0 z-10 bg-white dark:bg-neutral-900 group-hover:bg-slate-50/80 dark:group-hover:bg-slate-800/50 border-l-2 border-l-primary/10 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                      )}
+                      style={{
+                        width: cell.column.getSize(),
+                        left: isPinned === "left" ? `${cell.column.getStart("left")}px` : undefined,
+                        right: isPinned === "right" ? `${cell.column.getAfter("right")}px` : undefined,
+                      }}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
       
-      {/* Footer / Status Bar */}
-      <div className="bg-slate-50 dark:bg-neutral-950 border-t p-2 text-xs text-muted-foreground flex justify-between items-center">
-        <span>{data?.rows.length.toLocaleString()} Records</span>
-        <span>Virtualized • Enterprise Mode</span>
+      {/* Footer / Pagination Bar */}
+      <div className="bg-slate-50 dark:bg-neutral-950 border-t p-3 text-xs text-muted-foreground flex justify-between items-center">
+        <span>{data?.pagination ? `Page ${pageIndex + 1} of ${totalPages} • ${data.pagination.totalRows.toLocaleString()} Total Records` : `${data?.rows.length.toLocaleString()} Records`}</span>
+        <div className="flex items-center gap-2">
+          <select 
+            value={pageSize} 
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            className="px-2 py-1 rounded border bg-white dark:bg-neutral-900 text-xs"
+          >
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+            <option value={100}>100 per page</option>
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPageIndex(pageIndex - 1)}
+            disabled={!canPreviousPage}
+            className="text-xs h-8"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPageIndex(pageIndex + 1)}
+            disabled={!canNextPage}
+            className="text-xs h-8"
+          >
+            Next
+          </Button>
+          <span className="text-xs ml-2">Paginated • Enterprise Mode</span>
+        </div>
       </div>
     </div>
   );

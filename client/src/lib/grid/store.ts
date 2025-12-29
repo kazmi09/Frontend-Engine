@@ -4,11 +4,15 @@ import { GridState } from "./types";
 import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState } from "@tanstack/react-table";
 
 interface GridStore extends GridState {
+  pageIndex: number;
+  pageSize: number;
   setColumnVisibility: OnChangeFn<VisibilityState>;
   setColumnOrder: OnChangeFn<ColumnOrderState>;
   setColumnPinning: OnChangeFn<ColumnPinningState>;
   setColumnSizing: OnChangeFn<ColumnSizingState>;
   setSorting: OnChangeFn<SortingState>;
+  setPageIndex: (index: number) => void;
+  setPageSize: (size: number) => void;
   resetLayout: () => void;
 }
 
@@ -26,6 +30,8 @@ export const useGridStore = create<GridStore>()(
   persist(
     (set) => ({
       ...initialState,
+      pageIndex: 0,
+      pageSize: 20,
       setColumnVisibility: (updaterOrValue) =>
         set((state) => {
           const newVisibility = typeof updaterOrValue === "function" ? updaterOrValue(state.columnVisibility) : updaterOrValue;
@@ -51,6 +57,8 @@ export const useGridStore = create<GridStore>()(
           const newSorting = typeof updaterOrValue === "function" ? updaterOrValue(state.sorting) : updaterOrValue;
           return { sorting: newSorting };
         }),
+      setPageIndex: (index) => set({ pageIndex: index }),
+      setPageSize: (size) => set({ pageSize: size }),
       resetLayout: () => set(initialState),
     }),
     {

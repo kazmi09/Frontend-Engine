@@ -17,10 +17,13 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Get all employees
+  // Get all employees (with optional pagination)
   app.get("/api/employees", async (req, res) => {
     try {
-      const employees = await storage.getAllEmployees();
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const { rows: employees, total } = await storage.getEmployeesPaginated(limit, offset);
       
       // Transform to match frontend DataResult format
       const result = {
@@ -102,7 +105,12 @@ export async function registerRoutes(
           isRemote: emp.isRemote,
           manager: emp.manager,
           notes: emp.notes,
-        }))
+        })),
+        pagination: {
+          pageIndex: Math.floor(offset / limit),
+          pageSize: limit,
+          totalRows: total,
+        }
       };
       
       res.json(result);

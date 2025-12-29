@@ -5,13 +5,15 @@ import { employeeApi } from "@/lib/api/employees";
 import { Button } from "@/components/ui/button";
 import { Database } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useGridStore } from "@/lib/grid/store";
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const { pageIndex, pageSize } = useGridStore();
   
   const { data, isLoading, isRefetching, refetch } = useQuery({
-    queryKey: ["grid-data"],
-    queryFn: employeeApi.getAll,
+    queryKey: ["grid-data", pageIndex, pageSize],
+    queryFn: () => employeeApi.getAll(pageIndex, pageSize),
     staleTime: 60000, // 1 min cache
   });
 

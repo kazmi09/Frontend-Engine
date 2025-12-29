@@ -37,4 +37,9 @@ export interface DataResult {
   primaryKey: string;
   columns: ColumnConfig[];
   rows: DataRow[];
+  pagination?: {
+    pageIndex: number;
+    pageSize: number;
+    totalRows: number;
+  };
 }
