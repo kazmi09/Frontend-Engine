@@ -246,22 +246,33 @@ export async function registerRoutes(
         });
       }
 
-      console.log("[API] Fetching orders from MySQL...");
+      console.log("[API] Fetching employees from MySQL...");
       
+      // Parse pagination parameters
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 1000);
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      // Get total count for pagination
+      const countQuery = `SELECT COUNT(*) as total FROM employees_temp`;
+      const countResult = await queryMySQL<any>(countQuery);
+      const totalRows = countResult[0]?.total || 0;
+      
+      // Get paginated data
       const query = `
-        select employee_id,
-        first_name,last_name,
+        SELECT employee_id,
+        first_name, last_name,
         email,
         department,
         job_title,
         salary,
         hire_date 
-      from employees_temp
-    order by employee_id desc
+        FROM employees_temp
+        ORDER BY employee_id DESC
+        LIMIT ${limit} OFFSET ${offset}
       `;
 
       const rows = await queryMySQL<any>(query);
-      console.log(`[API] Successfully fetched ${rows.length} orders`);
+      console.log(`[API] Successfully fetched ${rows.length} employees (${offset + 1}-${offset + rows.length} of ${totalRows})`);
 
       // Transform to match frontend DataResult format
       const result = {
@@ -299,7 +310,7 @@ export async function registerRoutes(
           { 
             id: "department", 
             label: "Department", 
-            type: "number", 
+            type: "string", 
             width: 140, 
             editable: true 
           },
@@ -326,21 +337,26 @@ export async function registerRoutes(
           },
         ],
         rows: rows.map((row, index) => ({
-          id: `${row.employee_id}-${index}`, // Create unique ID from order_id and index
+          id: `${row.employee_id}-${index}`, 
           employee_id: row.employee_id,
           first_name: row.first_name || "",
           last_name: row.last_name || "",
           email: row.email || "",
-          department: row.department || "", // Convert string to number
+          department: row.department || "",
           job_title: row.job_title || "",
           salary: row.salary || "",
           hire_date: row.hire_date || "",
-        }))
+        })),
+        pagination: {
+          pageIndex: Math.floor(offset / limit),
+          pageSize: limit,
+          totalRows: totalRows,
+        }
       };
       
       res.json(result);
     } catch (error: any) {
-      console.error("[API] Error fetching orders:", error);
+      console.error("[API] Error fetching employees:", error);
       console.error("[API] Error stack:", error.stack);
       
       // Provide more detailed error information
@@ -351,7 +367,7 @@ export async function registerRoutes(
                                 errorMessage.includes("ETIMEDOUT");
       
       res.status(500).json({ 
-        error: "Failed to fetch orders", 
+        error: "Failed to fetch employees", 
         message: errorMessage,
         details: isConnectionError 
           ? "Please check: 1) MySQL server is running, 2) Database credentials are correct, 3) Database 'desi_drop_beta' exists"
@@ -381,7 +397,9 @@ export async function registerRoutes(
         case "first_name":
         case "last_name":
         case "email":
-        case "department":  
+        case "department":
+        case "job_title":    
+        case "salary":
           // Update customer details - need to get customer_id from order first
           updateQuery = `UPDATE employees_temp SET ${field} = ? WHERE employee_id = ?`;
           params = [value,orderId];

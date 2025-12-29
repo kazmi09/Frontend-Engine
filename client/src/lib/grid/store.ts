@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { GridState } from "./types";
-import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState } from "@tanstack/react-table";
+import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/react-table";
 
 interface GridStore extends GridState {
   pageIndex: number;
   pageSize: number;
+  rowSelection: RowSelectionState;
   setColumnVisibility: OnChangeFn<VisibilityState>;
   setColumnOrder: OnChangeFn<ColumnOrderState>;
   setColumnPinning: OnChangeFn<ColumnPinningState>;
@@ -13,6 +14,7 @@ interface GridStore extends GridState {
   setSorting: OnChangeFn<SortingState>;
   setPageIndex: (index: number) => void;
   setPageSize: (size: number) => void;
+  setRowSelection: OnChangeFn<RowSelectionState>;
   resetLayout: () => void;
 }
 
@@ -32,6 +34,7 @@ export const useGridStore = create<GridStore>()(
       ...initialState,
       pageIndex: 0,
       pageSize: 20,
+      rowSelection: {},
       setColumnVisibility: (updaterOrValue) =>
         set((state) => {
           const newVisibility = typeof updaterOrValue === "function" ? updaterOrValue(state.columnVisibility) : updaterOrValue;
@@ -59,7 +62,12 @@ export const useGridStore = create<GridStore>()(
         }),
       setPageIndex: (index) => set({ pageIndex: index }),
       setPageSize: (size) => set({ pageSize: size }),
-      resetLayout: () => set(initialState),
+      setRowSelection: (updaterOrValue) =>
+        set((state) => {
+          const newSelection = typeof updaterOrValue === "function" ? updaterOrValue(state.rowSelection) : updaterOrValue;
+          return { rowSelection: newSelection };
+        }),
+      resetLayout: () => set({ ...initialState, rowSelection: {} }),
     }),
     {
       name: "nexus-grid-storage", // unique name for localStorage

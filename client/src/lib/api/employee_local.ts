@@ -3,41 +3,32 @@ import { DataResult } from "../grid/types";
 const API_BASE = "/api";
 
 export const employeeLocalApi = {
-  getAll: async (): Promise<DataResult> => {
-    const response = await fetch(`${API_BASE}/employees_local`);
-    
-    // Check if response is ok
+  getAll: async (
+    pageIndex: number = 0,
+    pageSize: number = 20
+  ): Promise<DataResult> => {
+    const offset = pageIndex * pageSize;
+    const limit = pageSize;
+
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE}/employees_local?${params.toString()}`
+    );
+
     if (!response.ok) {
-      // Try to parse as JSON, but handle non-JSON responses
       let errorMessage = "Failed to fetch employees_local";
-      const contentType = response.headers.get("content-type");
-      
-      if (contentType && contentType.includes("application/json")) {
-        try {
-          const error = await response.json();
-          errorMessage = error.message || error.error || errorMessage;
-        } catch {
-          // If JSON parsing fails, use default message
-        }
-      } else {
-        // If not JSON, try to get text
-        try {
-          const text = await response.text();
-          errorMessage = text || errorMessage;
-        } catch {
-          // Use default message
-        }
-      }
-      
+      try {
+        const err = await response.json();
+        errorMessage = err.message || err.error || errorMessage;
+      } catch {}
       throw new Error(errorMessage);
     }
-    
-    // Parse JSON response
-    try {
-      return await response.json();
-    } catch (error) {
-      throw new Error("Invalid JSON response from server");
-    }
+
+    return response.json();
   },
 
   updateField: async ({ rowId, columnId, value }: { rowId: string; columnId: string; value: any }) => {
