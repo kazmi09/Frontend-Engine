@@ -6,6 +6,7 @@ import {
   flexRender,
   ColumnDef,
   Row,
+  getPaginationRowModel,
   SortingState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
