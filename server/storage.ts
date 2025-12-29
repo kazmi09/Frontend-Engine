@@ -10,6 +10,7 @@ export interface IStorage {
   
   // Employee CRUD operations
   getAllEmployees(): Promise<Employee[]>;
+  getEmployeesPaginated(limit: number, offset: number): Promise<{ rows: Employee[]; total: number }>;
   getEmployee(id: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: UpdateEmployee): Promise<Employee | undefined>;
@@ -43,6 +44,13 @@ export class DatabaseStorage implements IStorage {
   // Employee operations
   async getAllEmployees(): Promise<Employee[]> {
     return await db.select().from(employees);
+  }
+
+  async getEmployeesPaginated(limit: number, offset: number): Promise<{ rows: Employee[]; total: number }> {
+    const rows = await db.select().from(employees).limit(limit).offset(offset);
+    const countResult = await db.select({ count: sql`count(*)` }).from(employees);
+    const total = Number(countResult[0]?.count || 0);
+    return { rows, total };
   }
 
   async getEmployee(id: string): Promise<Employee | undefined> {

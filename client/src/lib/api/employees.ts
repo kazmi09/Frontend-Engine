@@ -3,8 +3,11 @@ import { DataResult } from "../grid/types";
 const API_BASE = "/api";
 
 export const employeeApi = {
-  getAll: async (): Promise<DataResult> => {
-    const response = await fetch(`${API_BASE}/employees`);
+  getAll: async (pageIndex: number = 0, pageSize: number = 20): Promise<DataResult> => {
+    const offset = pageIndex * pageSize;
+    const limit = pageSize;
+    const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+    const response = await fetch(`${API_BASE}/employees?${params}`);
     if (!response.ok) {
       throw new Error("Failed to fetch employees");
     }
