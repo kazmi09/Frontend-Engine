@@ -10,19 +10,19 @@ import { useEffect } from "react";
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
-  const { pageIndex, pageSize } = useGridStore();
+  const { pageIndex, pageSize, searchText, filterBy } = useGridStore();
 
-  // React Query: fetch employees with server-side pagination
+  // React Query: fetch employees with server-side pagination, search, and filtering
   const { data, isLoading, isRefetching, refetch, error } = useQuery<DataResult, Error>({
-    queryKey: ["employees_local", pageIndex, pageSize],
-    queryFn: () => employeeLocalApi.getAll(pageIndex, pageSize),
+    queryKey: ["employees_local", pageIndex, pageSize, searchText, filterBy],
+    queryFn: () => employeeLocalApi.getAll(pageIndex, pageSize, searchText, filterBy),
     staleTime: 60_000,
   });
 
-  // Invalidate cache when pagination changes to ensure fresh data
+  // Invalidate cache when pagination, search, or filter changes to ensure fresh data
   useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ["employees_local"] });
-  }, [pageIndex, pageSize, queryClient]);
+  }, [pageIndex, pageSize, searchText, filterBy, queryClient]);
 
   return (
     <div className="h-screen w-full flex flex-col bg-slate-50 dark:bg-neutral-950 overflow-hidden">
@@ -30,10 +30,10 @@ export default function Dashboard() {
       <header className="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold font-mono">
-            N
+            S
           </div>
           <span className="font-semibold text-lg tracking-tight">
-            TanStack<span className="text-muted-foreground font-normal">Grid</span>
+            Shane <span className="text-muted-foreground font-normal">Tanstack</span>
           </span>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">

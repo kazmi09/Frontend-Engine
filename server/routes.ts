@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertEmployeeSchema, updateEmployeeSchema } from "@shared/schema";
 import { z } from "zod";
-import { queryMySQL } from "./mysql-db";
+import { queryMySQL, getMySQLPool } from "./mysql-db";
 
 const DEPARTMENTS = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Legal", "Product"];
 const STATUSES = ["Active", "Inactive", "Pending", "Archived"];
@@ -18,7 +18,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Get all employees (with optional pagination)
+  
   app.get("/api/employees", async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
@@ -251,13 +251,49 @@ export async function registerRoutes(
       // Parse pagination parameters
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 1000);
       const offset = parseInt(req.query.offset as string) || 0;
+      const searchText = (req.query.search as string) || "";
+      const filterBy = (req.query.filterBy as string) || "";
       
-      // Get total count for pagination
-      const countQuery = `SELECT COUNT(*) as total FROM employees_temp`;
-      const countResult = await queryMySQL<any>(countQuery);
+      // Whitelist of allowed column names for filtering (to prevent SQL injection)
+      const allowedColumns: Record<string, string> = {
+        employee_id: "employee_id",
+        first_name: "first_name",
+        last_name: "last_name",
+        email: "email",
+        department: "department",
+        job_title: "job_title",
+        salary: "salary",
+        hire_date: "hire_date",
+      };
+      
+      // Build WHERE clause for filtering
+      let whereClause = "";
+      const queryParams: any[] = [];
+      
+      if (searchText && filterBy && allowedColumns[filterBy]) {
+        // Filter by specific column
+        whereClause = `WHERE ${allowedColumns[filterBy]} LIKE ?`;
+        queryParams.push(`%${searchText}%`);
+      } else if (searchText) {
+        // Search across all searchable columns
+        whereClause = `WHERE (
+          employee_id LIKE ? OR
+          first_name LIKE ? OR
+          last_name LIKE ? OR
+          email LIKE ? OR
+          department LIKE ? OR
+          job_title LIKE ?
+        )`;
+        const searchPattern = `%${searchText}%`;
+        queryParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+      }
+      
+      // Get total count for pagination (with filters)
+      const countQuery = `SELECT COUNT(*) as total FROM employees_temp ${whereClause}`;
+      const countResult = await queryMySQL<any>(countQuery, queryParams);
       const totalRows = countResult[0]?.total || 0;
       
-      // Get paginated data
+      // Get paginated data (with filters)
       const query = `
         SELECT employee_id,
         first_name, last_name,
@@ -267,11 +303,12 @@ export async function registerRoutes(
         salary,
         hire_date 
         FROM employees_temp
+        ${whereClause}
         ORDER BY employee_id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
 
-      const rows = await queryMySQL<any>(query);
+      const rows = await queryMySQL<any>(query, queryParams);
       console.log(`[API] Successfully fetched ${rows.length} employees (${offset + 1}-${offset + rows.length} of ${totalRows})`);
 
       // Transform to match frontend DataResult format
@@ -376,18 +413,48 @@ export async function registerRoutes(
     }
   });
 
-  // Update a single order field (optimized for inline editing)
+  // Update a single employee field (optimized for inline editing)
   app.patch("/api/employee_local/:id/field", async (req, res) => {
     try {
-      const { id } = req.params; // Format: "order_id-index"
+      const { id } = req.params; // Format: "employee_id-index"
       const { field, value } = req.body;
       
-      if (!field || value === undefined) {
-        return res.status(400).json({ error: "Field and value are required" });
+      console.log(`[API] Received update request:`, {
+        id,
+        field,
+        value,
+        valueType: typeof value,
+        body: req.body
+      });
+      
+      if (!field) {
+        return res.status(400).json({ error: "Field is required" });
+      }
+      
+      // Allow empty strings and null values, but not undefined
+      if (value === undefined) {
+        return res.status(400).json({ error: "Value is required (can be empty string or null)" });
       }
 
-      // Parse the ID to get order_id (format: "order_id-index")
-      const orderId = id.split("-")[0];
+      // Parse the ID to get employee_id (format: "employee_id-index")
+      const employeeIdStr = id.split("-")[0];
+      
+      if (!employeeIdStr) {
+        return res.status(400).json({ error: "Invalid employee ID format" });
+      }
+      
+      // Keep as string - employee_id from database might be string or number
+      // MySQL will handle the type conversion automatically
+      const employeeId = employeeIdStr;
+      
+      console.log(`[API] Updating employee field:`, {
+        rowId: id,
+        employeeId,
+        employeeIdType: typeof employeeId,
+        field,
+        value,
+        valueType: typeof value
+      });
       
       // Determine which table to update based on the field
       let updateQuery = "";
@@ -400,33 +467,105 @@ export async function registerRoutes(
         case "department":
         case "job_title":    
         case "salary":
-          // Update customer details - need to get customer_id from order first
+        case "hire_date":
+          // Update employee field - employee_id can be string or number, MySQL handles it
           updateQuery = `UPDATE employees_temp SET ${field} = ? WHERE employee_id = ?`;
-          params = [value,orderId];
+          params = [value, employeeId];
           break;
 
       
         default:
           return res.status(400).json({ error: `Field '${field}' is not editable` });
       }
-
-      // Execute the update
-      await queryMySQL(updateQuery, params);
       
-      console.log(`[API] Updated order field: ${field} for order ${orderId}`);
+      console.log(`[API] Executing query:`, { updateQuery, params });
 
-      // Return success response
-      res.json({ 
-        success: true, 
-        message: `Updated ${field} successfully`,
-        orderId,
-        field,
-        value
-      });
+      // Execute the update - need to use execute directly to get affectedRows
+      const pool = getMySQLPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        // First, verify the employee exists
+        const checkQuery = `SELECT employee_id, ${field} FROM employees_temp WHERE employee_id = ? LIMIT 1`;
+        const [checkRows] = await connection.execute(checkQuery, [employeeId]) as any;
+        
+        if (!checkRows || checkRows.length === 0) {
+          console.error(`[API] Employee not found: employee_id = ${employeeId} (type: ${typeof employeeId})`);
+          return res.status(404).json({ 
+            error: "Employee not found", 
+            message: `No employee found with ID ${employeeId}` 
+          });
+        }
+        
+        const currentValue = checkRows[0][field];
+        console.log(`[API] Employee found. Current value of ${field}:`, currentValue);
+        
+        // Execute the update
+        const [result] = await connection.execute(updateQuery, params) as any;
+        
+        // Check if any rows were affected
+        const affectedRows = result.affectedRows || 0;
+        const changedRows = result.changedRows || 0;
+        
+        console.log(`[API] Update result for employee_id ${employeeId}:`, {
+          affectedRows,
+          changedRows,
+          field,
+          oldValue: currentValue,
+          newValue: value
+        });
+        
+        if (affectedRows === 0) {
+          console.error(`[API] UPDATE query executed but no rows affected for employee_id ${employeeId}`);
+          return res.status(500).json({ 
+            error: "Update failed", 
+            message: `Update query executed but no rows were affected` 
+          });
+        }
+        
+        if (changedRows === 0 && affectedRows > 0) {
+          console.log(`[API] Row found but value unchanged for employee_id ${employeeId} (value was already ${value})`);
+        }
+
+        // Verify the update by fetching the updated row
+        const verifyQuery = `SELECT ${field} FROM employees_temp WHERE employee_id = ?`;
+        const [verifyRows] = await connection.execute(verifyQuery, [employeeId]) as any;
+        
+        if (verifyRows && verifyRows.length > 0) {
+          const updatedValue = verifyRows[0][field];
+          console.log(`[API] Verified update - new value in DB:`, updatedValue);
+          
+          if (String(updatedValue) !== String(value)) {
+            console.error(`[API] WARNING: Value mismatch! Expected: ${value}, Got: ${updatedValue}`);
+          }
+        } else {
+          console.error(`[API] WARNING: Could not verify update - employee not found after update`);
+        }
+
+        // Return success response
+        res.json({ 
+          success: true, 
+          message: `Updated ${field} successfully`,
+          employeeId: employeeId,
+          field,
+          value,
+          affectedRows,
+          changedRows
+        });
+      } finally {
+        connection.release();
+      }
     } catch (error: any) {
-      console.error("[API] Error updating order field:", error);
+      console.error("[API] Error updating employee field:", error);
+      console.error("[API] Error details:", {
+        id: req.params.id,
+        field: req.body.field,
+        value: req.body.value,
+        error: error.message,
+        stack: error.stack
+      });
       res.status(500).json({ 
-        error: "Failed to update order", 
+        error: "Failed to update employee", 
         message: error.message || "Database error"
       });
     }

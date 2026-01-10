@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useGridStore } from "@/lib/grid/store";
-import { Download, Filter, LayoutTemplate, RefreshCw, RotateCcw, Settings2, Columns, UserCog } from "lucide-react";
+import { Download, Filter, LayoutTemplate, RefreshCw, RotateCcw, Settings2, Columns, UserCog, Search, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -15,6 +16,7 @@ import {
 import { DataResult } from "@/lib/grid/types";
 import { useAuthStore, UserRole } from "@/lib/auth/store";
 import { Badge } from "@/components/ui/badge";
+import { useMemo } from "react";
 
 interface GridToolbarProps {
   onRefresh: () => void;
@@ -23,8 +25,25 @@ interface GridToolbarProps {
 }
 
 export function GridToolbar({ onRefresh, isRefetching, data }: GridToolbarProps) {
-  const { resetLayout, columnVisibility, setColumnVisibility } = useGridStore();
+  const { 
+    resetLayout, 
+    columnVisibility, 
+    setColumnVisibility,
+    searchText,
+    setSearchText,
+    filterBy,
+    setFilterBy,
+    resetFilters
+  } = useGridStore();
   const { user, setRole } = useAuthStore();
+
+  // Get available filter columns
+  const filterableColumns = useMemo(() => {
+    if (!data?.columns) return [];
+    return data.columns.filter(col => 
+      col.type === "string" || col.type === "number"
+    );
+  }, [data?.columns]);
 
   return (
     <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-neutral-900">
@@ -47,6 +66,62 @@ export function GridToolbar({ onRefresh, isRefetching, data }: GridToolbarProps)
             Reset Layout
           </Button>
         </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex items-center gap-2 flex-1 max-w-md mx-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="pl-8 pr-8 h-8"
+          />
+          {searchText && (
+            <button
+              onClick={() => setSearchText("")}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-2">
+              <Filter className="h-3.5 w-3.5" />
+              {filterBy ? (
+                <span className="max-w-[100px] truncate">
+                  {data?.columns.find(c => c.id === filterBy)?.label || "Filter"}
+                </span>
+              ) : (
+                "All"
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[200px]">
+            <DropdownMenuLabel>Filter By Column</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup value={filterBy} onValueChange={setFilterBy}>
+              <DropdownMenuRadioItem value="">All Columns</DropdownMenuRadioItem>
+              {filterableColumns.map((column) => (
+                <DropdownMenuRadioItem key={column.id} value={column.id}>
+                  {column.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            {searchText && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={resetFilters}>
+                  Clear Filters
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="flex items-center gap-2">
@@ -99,9 +174,6 @@ export function GridToolbar({ onRefresh, isRefetching, data }: GridToolbarProps)
           </DropdownMenuContent>
         </DropdownMenu>
         
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Download className="h-4 w-4 text-muted-foreground" />
         </Button>

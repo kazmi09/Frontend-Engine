@@ -5,7 +5,9 @@ const API_BASE = "/api";
 export const employeeLocalApi = {
   getAll: async (
     pageIndex: number = 0,
-    pageSize: number = 20
+    pageSize: number = 20,
+    searchText: string = "",
+    filterBy: string = ""
   ): Promise<DataResult> => {
     const offset = pageIndex * pageSize;
     const limit = pageSize;
@@ -14,6 +16,13 @@ export const employeeLocalApi = {
       limit: limit.toString(),
       offset: offset.toString(),
     });
+
+    if (searchText) {
+      params.append("search", searchText);
+    }
+    if (filterBy) {
+      params.append("filterBy", filterBy);
+    }
 
     const response = await fetch(
       `${API_BASE}/employees_local?${params.toString()}`

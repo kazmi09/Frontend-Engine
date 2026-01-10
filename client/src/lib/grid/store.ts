@@ -7,6 +7,8 @@ interface GridStore extends GridState {
   pageIndex: number;
   pageSize: number;
   rowSelection: RowSelectionState;
+  searchText: string;
+  filterBy: string; // Field to filter by (e.g., "employee_id", "first_name", etc.)
   setColumnVisibility: OnChangeFn<VisibilityState>;
   setColumnOrder: OnChangeFn<ColumnOrderState>;
   setColumnPinning: OnChangeFn<ColumnPinningState>;
@@ -15,7 +17,10 @@ interface GridStore extends GridState {
   setPageIndex: (index: number) => void;
   setPageSize: (size: number) => void;
   setRowSelection: OnChangeFn<RowSelectionState>;
+  setSearchText: (text: string) => void;
+  setFilterBy: (field: string) => void;
   resetLayout: () => void;
+  resetFilters: () => void;
 }
 
 const initialState: GridState = {
@@ -32,9 +37,6 @@ export const useGridStore = create<GridStore>()(
   persist(
     (set) => ({
       ...initialState,
-      pageIndex: 0,
-      pageSize: 20,
-      rowSelection: {},
       setColumnVisibility: (updaterOrValue) =>
         set((state) => {
           const newVisibility = typeof updaterOrValue === "function" ? updaterOrValue(state.columnVisibility) : updaterOrValue;
@@ -60,6 +62,11 @@ export const useGridStore = create<GridStore>()(
           const newSorting = typeof updaterOrValue === "function" ? updaterOrValue(state.sorting) : updaterOrValue;
           return { sorting: newSorting };
         }),
+      pageIndex: 0,
+      pageSize: 20,
+      rowSelection: {},
+      searchText: "",
+      filterBy: "", // Default to no filter (search all columns)
       setPageIndex: (index) => set({ pageIndex: index }),
       setPageSize: (size) => set({ pageSize: size }),
       setRowSelection: (updaterOrValue) =>
@@ -67,7 +74,14 @@ export const useGridStore = create<GridStore>()(
           const newSelection = typeof updaterOrValue === "function" ? updaterOrValue(state.rowSelection) : updaterOrValue;
           return { rowSelection: newSelection };
         }),
-      resetLayout: () => set({ ...initialState, rowSelection: {} }),
+      setSearchText: (text) => {
+        set({ searchText: text, pageIndex: 0 }); // Reset to first page when searching
+      },
+      setFilterBy: (field) => {
+        set({ filterBy: field, pageIndex: 0 }); // Reset to first page when changing filter field
+      },
+      resetLayout: () => set({ ...initialState, rowSelection: {}, searchText: "", filterBy: "" }),
+      resetFilters: () => set({ searchText: "", filterBy: "", pageIndex: 0 }),
     }),
     {
       name: "nexus-grid-storage", // unique name for localStorage
