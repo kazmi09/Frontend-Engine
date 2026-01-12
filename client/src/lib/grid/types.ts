@@ -1,4 +1,4 @@
-import { type ColumnDef } from "@tanstack/react-table";
+import { type ColumnDef } from "@tanstack/vue-table";
 
 export type ColumnType = "string" | "number" | "date" | "boolean" | "select";
 
@@ -26,6 +26,13 @@ export interface GridState {
   };
   columnSizing: Record<string, number>;
   sorting: { id: string; desc: boolean }[];
+}
+
+export interface FilterState {
+  [columnId: string]: {
+    value: any;
+    operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'gt' | 'lt' | 'gte' | 'lte';
+  };
 }
 
 export interface DataRow {

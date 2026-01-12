@@ -1,27 +1,7 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import { GridState } from "./types";
-import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/react-table";
-
-interface GridStore extends GridState {
-  pageIndex: number;
-  pageSize: number;
-  rowSelection: RowSelectionState;
-  searchText: string;
-  filterBy: string; // Field to filter by (e.g., "employee_id", "first_name", etc.)
-  setColumnVisibility: OnChangeFn<VisibilityState>;
-  setColumnOrder: OnChangeFn<ColumnOrderState>;
-  setColumnPinning: OnChangeFn<ColumnPinningState>;
-  setColumnSizing: OnChangeFn<ColumnSizingState>;
-  setSorting: OnChangeFn<SortingState>;
-  setPageIndex: (index: number) => void;
-  setPageSize: (size: number) => void;
-  setRowSelection: OnChangeFn<RowSelectionState>;
-  setSearchText: (text: string) => void;
-  setFilterBy: (field: string) => void;
-  resetLayout: () => void;
-  resetFilters: () => void;
-}
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { GridState, FilterState } from './types'
+import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/vue-table"
 
 const initialState: GridState = {
   columnVisibility: {},
@@ -29,63 +9,165 @@ const initialState: GridState = {
   columnPinning: { left: [], right: [] },
   columnSizing: {},
   sorting: [],
-};
+}
 
-// We use a factory function to create unique stores per grid ID if needed
-// For this MVP, we'll use a single global store for the main grid
-export const useGridStore = create<GridStore>()(
-  persist(
-    (set) => ({
-      ...initialState,
-      setColumnVisibility: (updaterOrValue) =>
-        set((state) => {
-          const newVisibility = typeof updaterOrValue === "function" ? updaterOrValue(state.columnVisibility) : updaterOrValue;
-          return { columnVisibility: newVisibility };
-        }),
-      setColumnOrder: (updaterOrValue) =>
-        set((state) => {
-          const newOrder = typeof updaterOrValue === "function" ? updaterOrValue(state.columnOrder) : updaterOrValue;
-          return { columnOrder: newOrder };
-        }),
-      setColumnPinning: (updaterOrValue) =>
-        set((state) => {
-          const newPinning = typeof updaterOrValue === "function" ? updaterOrValue(state.columnPinning) : updaterOrValue;
-          return { columnPinning: newPinning };
-        }),
-      setColumnSizing: (updaterOrValue) =>
-        set((state) => {
-          const newSizing = typeof updaterOrValue === "function" ? updaterOrValue(state.columnSizing) : updaterOrValue;
-          return { columnSizing: newSizing };
-        }),
-      setSorting: (updaterOrValue) =>
-        set((state) => {
-          const newSorting = typeof updaterOrValue === "function" ? updaterOrValue(state.sorting) : updaterOrValue;
-          return { sorting: newSorting };
-        }),
-      pageIndex: 0,
-      pageSize: 20,
-      rowSelection: {},
-      searchText: "",
-      filterBy: "", // Default to no filter (search all columns)
-      setPageIndex: (index) => set({ pageIndex: index }),
-      setPageSize: (size) => set({ pageSize: size }),
-      setRowSelection: (updaterOrValue) =>
-        set((state) => {
-          const newSelection = typeof updaterOrValue === "function" ? updaterOrValue(state.rowSelection) : updaterOrValue;
-          return { rowSelection: newSelection };
-        }),
-      setSearchText: (text) => {
-        set({ searchText: text, pageIndex: 0 }); // Reset to first page when searching
-      },
-      setFilterBy: (field) => {
-        set({ filterBy: field, pageIndex: 0 }); // Reset to first page when changing filter field
-      },
-      resetLayout: () => set({ ...initialState, rowSelection: {}, searchText: "", filterBy: "" }),
-      resetFilters: () => set({ searchText: "", filterBy: "", pageIndex: 0 }),
-    }),
-    {
-      name: "nexus-grid-storage", // unique name for localStorage
-      storage: createJSONStorage(() => localStorage),
+export const useGridStore = defineStore('grid', () => {
+  // State
+  const columnVisibility = ref<VisibilityState>(initialState.columnVisibility)
+  const columnOrder = ref<ColumnOrderState>(initialState.columnOrder)
+  const columnPinning = ref<ColumnPinningState>(initialState.columnPinning)
+  const columnSizing = ref<ColumnSizingState>(initialState.columnSizing)
+  const sorting = ref<SortingState>(initialState.sorting)
+  
+  // Pagination
+  const pageIndex = ref(0)
+  const pageSize = ref(20)
+  
+  // Selection
+  const rowSelection = ref<RowSelectionState>({})
+  
+  // Search and filtering
+  const searchText = ref('')
+  const filterBy = ref('')
+  const filters = ref<FilterState>({})
+  
+  // Computed
+  const hasFilters = computed(() => Object.keys(filters.value).length > 0)
+  const hasSearch = computed(() => searchText.value.length > 0)
+  
+  // Actions
+  const setColumnVisibility: OnChangeFn<VisibilityState> = (updaterOrValue) => {
+    console.log('Store setColumnVisibility called with:', updaterOrValue)
+    if (typeof updaterOrValue === 'function') {
+      const newValue = updaterOrValue(columnVisibility.value)
+      console.log('Function updater result:', newValue)
+      columnVisibility.value = newValue
+    } else {
+      console.log('Direct value update:', updaterOrValue)
+      columnVisibility.value = updaterOrValue
     }
-  )
-);
+    console.log('New columnVisibility state:', columnVisibility.value)
+  }
+  
+  const setColumnOrder: OnChangeFn<ColumnOrderState> = (updaterOrValue) => {
+    if (typeof updaterOrValue === 'function') {
+      columnOrder.value = updaterOrValue(columnOrder.value)
+    } else {
+      columnOrder.value = updaterOrValue
+    }
+  }
+  
+  const setColumnPinning: OnChangeFn<ColumnPinningState> = (updaterOrValue) => {
+    if (typeof updaterOrValue === 'function') {
+      columnPinning.value = updaterOrValue(columnPinning.value)
+    } else {
+      columnPinning.value = updaterOrValue
+    }
+  }
+  
+  const setColumnSizing: OnChangeFn<ColumnSizingState> = (updaterOrValue) => {
+    if (typeof updaterOrValue === 'function') {
+      columnSizing.value = updaterOrValue(columnSizing.value)
+    } else {
+      columnSizing.value = updaterOrValue
+    }
+  }
+  
+  const setSorting: OnChangeFn<SortingState> = (updaterOrValue) => {
+    console.log('Store setSorting called with:', updaterOrValue)
+    if (typeof updaterOrValue === 'function') {
+      const newValue = updaterOrValue(sorting.value)
+      console.log('Function updater result:', newValue)
+      sorting.value = newValue
+    } else {
+      console.log('Direct value update:', updaterOrValue)
+      sorting.value = updaterOrValue
+    }
+    console.log('New sorting state:', sorting.value)
+  }
+  
+  const setPageIndex = (index: number) => {
+    pageIndex.value = index
+  }
+  
+  const setPageSize = (size: number) => {
+    pageSize.value = size
+    pageIndex.value = 0 // Reset to first page when changing page size
+  }
+  
+  const setRowSelection: OnChangeFn<RowSelectionState> = (updaterOrValue) => {
+    if (typeof updaterOrValue === 'function') {
+      rowSelection.value = updaterOrValue(rowSelection.value)
+    } else {
+      rowSelection.value = updaterOrValue
+    }
+  }
+  
+  const setSearchText = (text: string) => {
+    searchText.value = text
+    pageIndex.value = 0 // Reset to first page when searching
+  }
+  
+  const setFilterBy = (field: string) => {
+    filterBy.value = field
+    pageIndex.value = 0 // Reset to first page when filtering
+  }
+  
+  const setFilter = (columnId: string, filter: FilterState[string] | null) => {
+    if (filter === null) {
+      delete filters.value[columnId]
+    } else {
+      filters.value[columnId] = filter
+    }
+    pageIndex.value = 0 // Reset to first page when filtering
+  }
+  
+  const resetLayout = () => {
+    columnVisibility.value = initialState.columnVisibility
+    columnOrder.value = initialState.columnOrder
+    columnPinning.value = initialState.columnPinning
+    columnSizing.value = initialState.columnSizing
+    sorting.value = initialState.sorting
+  }
+  
+  const resetFilters = () => {
+    searchText.value = ''
+    filterBy.value = ''
+    filters.value = {}
+    pageIndex.value = 0
+  }
+  
+  return {
+    // State
+    columnVisibility,
+    columnOrder,
+    columnPinning,
+    columnSizing,
+    sorting,
+    pageIndex,
+    pageSize,
+    rowSelection,
+    searchText,
+    filterBy,
+    filters,
+    
+    // Computed
+    hasFilters,
+    hasSearch,
+    
+    // Actions
+    setColumnVisibility,
+    setColumnOrder,
+    setColumnPinning,
+    setColumnSizing,
+    setSorting,
+    setPageIndex,
+    setPageSize,
+    setRowSelection,
+    setSearchText,
+    setFilterBy,
+    setFilter,
+    resetLayout,
+    resetFilters,
+  }
+})

@@ -9,6 +9,8 @@ export const employeeLocalApi = {
     searchText: string = "",
     filterBy: string = ""
   ): Promise<DataResult> => {
+    console.log('API call with params:', { pageIndex, pageSize, searchText, filterBy })
+    
     const offset = pageIndex * pageSize;
     const limit = pageSize;
 
@@ -24,9 +26,10 @@ export const employeeLocalApi = {
       params.append("filterBy", filterBy);
     }
 
-    const response = await fetch(
-      `${API_BASE}/employees_local?${params.toString()}`
-    );
+    const url = `${API_BASE}/employees_local?${params.toString()}`
+    console.log('Fetching URL:', url)
+
+    const response = await fetch(url);
 
     if (!response.ok) {
       let errorMessage = "Failed to fetch employees_local";
@@ -34,10 +37,13 @@ export const employeeLocalApi = {
         const err = await response.json();
         errorMessage = err.message || err.error || errorMessage;
       } catch {}
+      console.error('API Error:', errorMessage)
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log('API Response:', result)
+    return result;
   },
 
   updateField: async ({ rowId, columnId, value }: { rowId: string; columnId: string; value: any }) => {
@@ -57,4 +63,3 @@ export const employeeLocalApi = {
     return response.json();
   },
 };
-

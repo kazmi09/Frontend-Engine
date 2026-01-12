@@ -1,14 +1,23 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { DataResult, DataRow } from "./types";
-import { toast } from "@/hooks/use-toast";
-import { employeeLocalApi } from "../api/employee_local";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { DataResult } from "@/lib/grid/types";
+import { employeeLocalApi } from "@/lib/api/employee_local";
+import { ref } from 'vue';
+import { useQuasar } from 'quasar';
+
+// Global state to track which cell is currently being updated
+const updatingCells = ref(new Set<string>());
 
 export function useGridUpdate() {
   const queryClient = useQueryClient();
+  const $q = useQuasar();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: employeeLocalApi.updateField,
     onMutate: async ({ rowId, columnId, value }) => {
+      // Track this specific cell as updating
+      const cellKey = `${rowId}-${columnId}`;
+      updatingCells.value.add(cellKey);
+
       // Cancel any outgoing refetches for all employees_local queries
       await queryClient.cancelQueries({ queryKey: ["employees_local"] });
 
@@ -32,24 +41,34 @@ export function useGridUpdate() {
         }
       });
 
-      return { previousDataMap };
+      return { previousDataMap, cellKey };
     },
     onError: (err, variables, context) => {
+      // Remove from updating cells
+      if (context?.cellKey) {
+        updatingCells.value.delete(context.cellKey);
+      }
+
       // Rollback to the previous values for all queries
       if (context?.previousDataMap) {
         context.previousDataMap.forEach((previousData, queryKey) => {
           queryClient.setQueryData(queryKey, previousData);
         });
       }
-      toast({
-        title: "Update Failed",
-        description: "Could not save your changes. Data has been rolled back.",
-        variant: "destructive",
+      
+      $q.notify({
+        type: 'negative',
+        message: 'Update Failed',
+        caption: 'Could not save your changes. Data has been rolled back.',
+        position: 'top-right',
       });
     },
     onSuccess: (data, variables) => {
+      // Remove from updating cells
+      const cellKey = `${variables.rowId}-${variables.columnId}`;
+      updatingCells.value.delete(cellKey);
+
       // The optimistic update is already applied and visible in the UI
-      // The changes are shown immediately via the optimistic update
       console.log("[Grid Update] Successfully saved to database:", { 
         rowId: variables.rowId, 
         columnId: variables.columnId, 
@@ -58,14 +77,24 @@ export function useGridUpdate() {
       });
       
       // Show a subtle success indicator
-      toast({
-        title: "Saved",
-        description: `Updated ${variables.columnId}`,
-        duration: 2000,
+      $q.notify({
+        type: 'positive',
+        message: 'Saved',
+        caption: `Updated ${variables.columnId}`,
+        timeout: 2000,
+        position: 'top-right',
       });
-      
-      // Note: We don't invalidate here to keep the optimistic update visible
-      // The refresh button will manually invalidate and fetch fresh data from database
     },
   });
+
+  // Function to check if a specific cell is updating
+  const isCellUpdating = (rowId: string, columnId: string) => {
+    const cellKey = `${rowId}-${columnId}`;
+    return updatingCells.value.has(cellKey);
+  };
+
+  return {
+    ...mutation,
+    isCellUpdating,
+  };
 }

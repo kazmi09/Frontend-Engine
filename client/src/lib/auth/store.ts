@@ -1,29 +1,25 @@
-import { create } from "zustand";
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
 
-export type UserRole = "admin" | "editor" | "viewer";
-
-interface User {
-  id: string;
-  name: string;
-  role: UserRole;
-  avatar?: string;
+export interface User {
+  id: string
+  name: string
+  role: 'admin' | 'editor' | 'viewer'
 }
 
-interface AuthState {
-  user: User;
-  setUser: (user: User) => void;
-  setRole: (role: UserRole) => void;
-}
+export const useAuthStore = defineStore('auth', () => {
+  const user = ref<User>({
+    id: 'demo-user',
+    name: 'Demo User',
+    role: 'admin'
+  })
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: {
-    id: "u1",
-    name: "Demo User",
-    role: "admin", // Default to admin for demo
-  },
-  setUser: (user) => set({ user }),
-  setRole: (role) =>
-    set((state) => ({
-      user: { ...state.user, role },
-    })),
-}));
+  const setUserRole = (role: User['role']) => {
+    user.value.role = role
+  }
+
+  return {
+    user,
+    setUserRole
+  }
+})
