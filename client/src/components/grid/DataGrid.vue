@@ -77,37 +77,60 @@
 
         <!-- Body -->
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr 
-            v-for="row in (table?.getRowModel?.()?.rows || [])" 
-            :key="row.id"
-            :class="getRowClass(row)"
-            class="hover:bg-gray-50"
-          >
-            <td
-              v-for="cell in (row?.getVisibleCells?.() || [])"
-              :key="cell.id"
-              :style="{ width: `${cell.column.getSize()}px` }"
-              class="border-b border-gray-200 px-4 py-3 whitespace-nowrap text-sm"
+          <template v-for="row in (table?.getRowModel?.()?.rows || [])" :key="row.id">
+            <!-- Main Row -->
+            <tr 
+              :class="getRowClass(row)"
+              class="hover:bg-gray-50"
             >
-              <!-- Selection Cell -->
-              <template v-if="cell.column.id === 'select'">
-                <q-checkbox
-                  :model-value="row?.getIsSelected?.()"
-                  @update:model-value="(value) => row?.toggleSelected?.(value)"
+              <td
+                v-for="cell in (row?.getVisibleCells?.() || [])"
+                :key="cell.id"
+                :style="{ width: `${cell.column.getSize()}px` }"
+                class="border-b border-gray-200 px-4 py-3 whitespace-nowrap text-sm"
+              >
+                <!-- Expander Cell -->
+                <ExpanderCell
+                  v-if="cell.column.id === 'expander'"
+                  :row-id="row.original.id"
+                  :can-expand="canExpandRow(row)"
+                  @toggle="handleToggleExpansion"
                 />
-              </template>
-              
-              <!-- Regular Cell -->
-              <template v-else>
+                
+                <!-- Selection Cell -->
+                <template v-else-if="cell.column.id === 'select'">
+                  <q-checkbox
+                    :model-value="row?.getIsSelected?.()"
+                    @update:model-value="(value) => row?.toggleSelected?.(value)"
+                  />
+                </template>
+                
+                <!-- Regular Cell -->
                 <EditableCell
+                  v-else
                   :value="cell.getValue()"
                   :row-id="row.original.id"
                   :column="getColumnConfig(cell.column.id)"
                   :width="cell.column.getSize()"
                 />
-              </template>
-            </td>
-          </tr>
+              </td>
+            </tr>
+            
+            <!-- Detail Panel Row -->
+            <template v-if="row.getIsExpanded?.()">
+              <DetailPanel
+                :row="row.original"
+                :row-id="row.original.id"
+                :column-count="row.getVisibleCells().length"
+                :expandable-config="props.data.expandable!"
+                @retry="handleRetryDetailLoad"
+              >
+                <template #default="slotProps">
+                  <slot name="detail-panel" v-bind="slotProps" />
+                </template>
+              </DetailPanel>
+            </template>
+          </template>
         </tbody>
       </table>
 
@@ -160,11 +183,15 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getPaginationRowModel,
+  getExpandedRowModel,
   type ColumnDef,
 } from '@tanstack/vue-table'
 import { useGridStore } from '@/lib/grid/store'
+import { useAuthStore } from '@/lib/auth/store'
 import { DataResult, ColumnConfig } from '@/lib/grid/types'
 import EditableCell from './cells/EditableCell.vue'
+import ExpanderCell from './cells/ExpanderCell.vue'
+import DetailPanel from './cells/DetailPanel.vue'
 
 const props = defineProps<{
   data: DataResult
@@ -173,6 +200,7 @@ const props = defineProps<{
 
 const tableContainerRef = ref<HTMLDivElement>()
 const gridStore = useGridStore()
+const authStore = useAuthStore()
 
 // Use storeToRefs to make store properties reactive
 const { 
@@ -184,14 +212,60 @@ const {
   pageIndex,
   pageSize,
   rowSelection,
+  expandedRows,
 } = storeToRefs(gridStore)
+
+const { user } = storeToRefs(authStore)
+
+// Check if user has permission to expand rows
+const hasExpandPermission = computed(() => {
+  console.log('=== EXPAND PERMISSION CHECK ===')
+  console.log('expandable config:', props.data?.expandable)
+  console.log('required permissions:', props.data?.expandable?.requiredPermissions)
+  console.log('user role:', user.value.role)
+  
+  if (!props.data?.expandable?.requiredPermissions) {
+    console.log('No permissions required, returning true')
+    return true
+  }
+  const userRole = user.value.role
+  const hasPermission = props.data.expandable.requiredPermissions.includes(userRole)
+  console.log('Has permission?', hasPermission)
+  console.log('=== END PERMISSION CHECK ===')
+  return hasPermission
+})
 
 // Columns definition
 const columns = computed<ColumnDef<any>[]>(() => {
+  console.log('=== COMPUTING COLUMNS ===')
   console.log('Computing columns, data:', props.data)
+  console.log('Has expandable?', !!props.data?.expandable)
+  console.log('Has permission?', hasExpandPermission.value)
+  
   if (!props.data?.columns || !Array.isArray(props.data.columns)) {
     console.log('No columns data available, returning empty array')
     return []
+  }
+  
+  const cols: ColumnDef<any>[] = []
+  
+  // Add expander column if expandable config exists and user has permissions
+  if (props.data.expandable && hasExpandPermission.value) {
+    console.log('✅ Adding expander column!')
+    cols.push({
+      id: "expander",
+      header: "",
+      cell: ({ row }) => row.original,
+      enableSorting: false,
+      enableHiding: false,
+      size: 50,
+      minSize: 50,
+      maxSize: 50,
+    })
+  } else {
+    console.log('❌ NOT adding expander column')
+    console.log('  - has expandable?', !!props.data.expandable)
+    console.log('  - has permission?', hasExpandPermission.value)
   }
   
   const selectColumn: ColumnDef<any> = {
@@ -219,9 +293,9 @@ const columns = computed<ColumnDef<any>[]>(() => {
     }
   }))
 
-  const result = [selectColumn, ...dataColumns]
-  console.log('Computed columns:', result)
-  return result
+  cols.push(selectColumn, ...dataColumns)
+  console.log('Computed columns:', cols)
+  return cols
 })
 
 // Table instance with reactive state
@@ -229,6 +303,10 @@ const table = useVueTable({
   data: computed(() => {
     const rows = props.data?.rows || []
     console.log('Table data:', rows.length, 'rows')
+    if (rows.length > 0) {
+      console.log('First row sample:', rows[0])
+      console.log('First row ID:', rows[0].id)
+    }
     return rows
   }),
   get columns() { 
@@ -255,6 +333,16 @@ const table = useVueTable({
     get rowSelection() { 
       return rowSelection.value 
     },
+    get expanded() {
+      console.log('[TABLE STATE] Getting expanded state:', expandedRows.value)
+      return expandedRows.value
+    },
+    get pagination() {
+      return {
+        pageIndex: pageIndex.value,
+        pageSize: pageSize.value,
+      }
+    },
   },
   onColumnVisibilityChange: (updater) => {
     console.log('onColumnVisibilityChange called with:', updater)
@@ -268,12 +356,57 @@ const table = useVueTable({
     gridStore.setSorting(updater)
   },
   onRowSelectionChange: gridStore.setRowSelection,
+  onExpandedChange: (updater) => {
+    console.log('[TABLE] onExpandedChange called with:', updater)
+    console.log('[TABLE] Current expandedRows:', expandedRows.value)
+    
+    let newState: Record<string, boolean>
+    
+    if (typeof updater === 'function') {
+      newState = updater(expandedRows.value)
+      console.log('[TABLE] New expanded state from updater:', newState)
+    } else {
+      newState = updater
+      console.log('[TABLE] Direct state update:', updater)
+    }
+    
+    // Get all row IDs that were previously expanded
+    const previouslyExpanded = Object.keys(expandedRows.value)
+    
+    // Process all rows in the new state
+    Object.keys(newState).forEach(rowId => {
+      if (newState[rowId]) {
+        gridStore.expandRow(rowId)
+      } else {
+        gridStore.collapseRow(rowId)
+      }
+    })
+    
+    // Collapse any rows that were expanded but are not in the new state
+    previouslyExpanded.forEach(rowId => {
+      if (!(rowId in newState)) {
+        console.log('[TABLE] Collapsing row not in new state:', rowId)
+        gridStore.collapseRow(rowId)
+      }
+    })
+  },
+  onPaginationChange: (updater) => {
+    if (typeof updater === 'function') {
+      const current = { pageIndex: pageIndex.value, pageSize: pageSize.value }
+      const newState = updater(current)
+      gridStore.setPageIndex(newState.pageIndex)
+      gridStore.setPageSize(newState.pageSize)
+    }
+  },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
+  getExpandedRowModel: getExpandedRowModel(),
+  getRowId: (row) => row.id, // Tell TanStack Table how to identify rows
   manualPagination: true,
   manualSorting: false, // Let TanStack Table handle sorting
   enableRowSelection: true,
+  enableExpanding: true,
   enableColumnResizing: true,
   columnResizeMode: "onChange",
 })
@@ -313,7 +446,78 @@ const getColumnConfig = (columnId: string): ColumnConfig => {
 }
 
 const getRowClass = (row: any) => {
-  return row.getIsSelected() ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+  const classes = []
+  if (row.getIsSelected()) {
+    classes.push('bg-blue-50 dark:bg-blue-900/20')
+  }
+  if (row.getIsExpanded?.()) {
+    classes.push('bg-gray-50')
+  }
+  return classes.join(' ')
+}
+
+// Check if a row can be expanded
+const canExpandRow = (row: any) => {
+  if (!props.data?.expandable) return false
+  if (props.data.expandable.canExpand) {
+    return props.data.expandable.canExpand(row.original)
+  }
+  return true
+}
+
+// Handle row expansion toggle
+const handleToggleExpansion = (rowId: string) => {
+  console.log('=== TOGGLE EXPANSION DEBUG ===')
+  console.log('Toggle expansion for row:', rowId)
+  console.log('Current expandedRows state:', JSON.stringify(expandedRows.value))
+  console.log('Is row currently expanded?', expandedRows.value[rowId])
+  
+  // Find the row in TanStack Table
+  const tableRows = table.getRowModel().rows
+  const targetRow = tableRows.find(r => r.original.id === rowId)
+  
+  if (targetRow) {
+    console.log('Found row in TanStack Table, current expanded state:', targetRow.getIsExpanded?.())
+    
+    // Handle singleExpand mode
+    if (props.data?.expandable?.singleExpand && !targetRow.getIsExpanded?.()) {
+      console.log('SingleExpand mode: collapsing all rows')
+      gridStore.collapseAllRows()
+    }
+    
+    // Use TanStack Table's toggle method
+    targetRow.toggleExpanded()
+    console.log('After toggleExpanded(), row state:', targetRow.getIsExpanded?.())
+  } else {
+    console.log('Could not find row in TanStack Table, falling back to store')
+    // Fallback to store method
+    if (props.data?.expandable?.singleExpand && !expandedRows.value[rowId]) {
+      gridStore.collapseAllRows()
+    }
+    gridStore.toggleRowExpansion(rowId)
+  }
+  
+  console.log('After toggle, expandedRows state:', JSON.stringify(expandedRows.value))
+  console.log('=== END DEBUG ===')
+}
+
+// Handle retry for lazy loading
+const handleRetryDetailLoad = async (rowId: string) => {
+  if (!props.data?.expandable?.lazyLoad) return
+  
+  gridStore.setDetailPanelLoading(rowId, true)
+  try {
+    const row = props.data.rows.find(r => r.id === rowId)
+    if (row) {
+      const data = await props.data.expandable.lazyLoad(row, rowId)
+      gridStore.setDetailPanelData(rowId, data)
+    }
+  } catch (err) {
+    gridStore.setDetailPanelError(
+      rowId,
+      err instanceof Error ? err.message : 'Failed to load detail data'
+    )
+  }
 }
 
 // Sorting
@@ -357,6 +561,29 @@ const startResize = (columnId: string, event: MouseEvent) => {
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
 }
+
+// Initialize default expanded rows
+onMounted(() => {
+  if (props.data?.expandable?.defaultExpanded) {
+    gridStore.expandAllRows(props.data.expandable.defaultExpanded)
+  }
+})
+
+// Cleanup expanded rows when data changes
+watch(() => props.data?.rows, (newRows) => {
+  if (newRows) {
+    const validRowIds = newRows.map(r => r.id)
+    gridStore.cleanupExpandedRows(validRowIds)
+  }
+}, { deep: true })
+
+// Cleanup expanded rows when page changes
+watch(pageIndex, () => {
+  if (props.data?.rows) {
+    const validRowIds = props.data.rows.map(r => r.id)
+    gridStore.cleanupExpandedRows(validRowIds)
+  }
+})
 </script>
 
 <style lang="sass" scoped>
