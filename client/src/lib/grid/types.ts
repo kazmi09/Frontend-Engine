@@ -1,4 +1,5 @@
 import { type ColumnDef } from "@tanstack/vue-table";
+import type { Component } from "vue";
 
 export type ColumnType = "string" | "number" | "date" | "boolean" | "select";
 
@@ -48,5 +49,36 @@ export interface DataResult {
     pageIndex: number;
     pageSize: number;
     totalRows: number;
+  };
+  expandable?: ExpandableConfig; // New property
+}
+
+// Expandable row configuration
+export interface ExpandableConfig<TData = any> {
+  // Renderer configuration (slot name or component)
+  renderer?: string | Component;
+  
+  // Lazy loading function
+  lazyLoad?: (row: TData, rowId: string) => Promise<any>;
+  
+  // Initially expanded row IDs
+  defaultExpanded?: string[];
+  
+  // Only allow one row expanded at a time
+  singleExpand?: boolean;
+  
+  // Required permissions to expand rows
+  requiredPermissions?: string[];
+  
+  // Custom row expansion check (e.g., only expand rows with children)
+  canExpand?: (row: TData) => boolean;
+}
+
+// Detail panel data state
+export interface DetailPanelState {
+  [rowId: string]: {
+    data: any;
+    loading: boolean;
+    error: string | null;
   };
 }

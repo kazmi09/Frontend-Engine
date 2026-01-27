@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { GridState, FilterState } from './types'
+import { GridState, FilterState, DetailPanelState } from './types'
 import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/vue-table"
 
 const initialState: GridState = {
@@ -31,9 +31,16 @@ export const useGridStore = defineStore('grid', () => {
   const filterBy = ref('')
   const filters = ref<FilterState>({})
   
+  // Expansion state
+  const expandedRows = ref<Record<string, boolean>>({})
+  const detailPanelData = ref<DetailPanelState>({})
+  
   // Computed
   const hasFilters = computed(() => Object.keys(filters.value).length > 0)
   const hasSearch = computed(() => searchText.value.length > 0)
+  const expandedRowIds = computed(() => 
+    Object.keys(expandedRows.value).filter(id => expandedRows.value[id])
+  )
   
   // Actions
   const setColumnVisibility: OnChangeFn<VisibilityState> = (updaterOrValue) => {
@@ -137,6 +144,73 @@ export const useGridStore = defineStore('grid', () => {
     pageIndex.value = 0
   }
   
+  // Expansion actions
+  const expandRow = (rowId: string) => {
+    expandedRows.value = { ...expandedRows.value, [rowId]: true }
+  }
+  
+  const collapseRow = (rowId: string) => {
+    expandedRows.value = { ...expandedRows.value, [rowId]: false }
+  }
+  
+  const toggleRowExpansion = (rowId: string) => {
+    console.log('[STORE] toggleRowExpansion called for:', rowId)
+    console.log('[STORE] Before:', JSON.stringify(expandedRows.value))
+    
+    // Create a new object to ensure Vue reactivity
+    const newExpandedRows = { ...expandedRows.value }
+    newExpandedRows[rowId] = !newExpandedRows[rowId]
+    expandedRows.value = newExpandedRows
+    
+    console.log('[STORE] After:', JSON.stringify(expandedRows.value))
+  }
+  
+  const expandAllRows = (rowIds: string[]) => {
+    const newExpandedRows = { ...expandedRows.value }
+    rowIds.forEach(id => {
+      newExpandedRows[id] = true
+    })
+    expandedRows.value = newExpandedRows
+  }
+  
+  const collapseAllRows = () => {
+    expandedRows.value = {}
+  }
+  
+  const setDetailPanelData = (rowId: string, data: any) => {
+    detailPanelData.value[rowId] = {
+      data,
+      loading: false,
+      error: null,
+    }
+  }
+  
+  const setDetailPanelLoading = (rowId: string, loading: boolean) => {
+    if (!detailPanelData.value[rowId]) {
+      detailPanelData.value[rowId] = { data: null, loading, error: null }
+    } else {
+      detailPanelData.value[rowId].loading = loading
+    }
+  }
+  
+  const setDetailPanelError = (rowId: string, error: string) => {
+    if (!detailPanelData.value[rowId]) {
+      detailPanelData.value[rowId] = { data: null, loading: false, error }
+    } else {
+      detailPanelData.value[rowId].error = error
+    }
+  }
+  
+  const cleanupExpandedRows = (validRowIds: string[]) => {
+    const validSet = new Set(validRowIds)
+    Object.keys(expandedRows.value).forEach(id => {
+      if (!validSet.has(id)) {
+        delete expandedRows.value[id]
+        delete detailPanelData.value[id]
+      }
+    })
+  }
+  
   return {
     // State
     columnVisibility,
@@ -154,6 +228,7 @@ export const useGridStore = defineStore('grid', () => {
     // Computed
     hasFilters,
     hasSearch,
+    expandedRowIds,
     
     // Actions
     setColumnVisibility,
@@ -169,5 +244,20 @@ export const useGridStore = defineStore('grid', () => {
     setFilter,
     resetLayout,
     resetFilters,
+    
+    // Expansion state
+    expandedRows,
+    detailPanelData,
+    
+    // Expansion actions
+    expandRow,
+    collapseRow,
+    toggleRowExpansion,
+    expandAllRows,
+    collapseAllRows,
+    setDetailPanelData,
+    setDetailPanelLoading,
+    setDetailPanelError,
+    cleanupExpandedRows,
   }
 })

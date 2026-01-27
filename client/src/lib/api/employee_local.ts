@@ -1,4 +1,5 @@
 import { DataResult } from "../grid/types";
+import EmployeeDetailPanel from "@/components/grid/EmployeeDetailPanel.vue";
 
 const API_BASE = "/api";
 
@@ -43,6 +44,14 @@ export const employeeLocalApi = {
 
     const result = await response.json();
     console.log('API Response:', result)
+    
+    // Add expandable configuration
+    result.expandable = {
+      renderer: EmployeeDetailPanel,
+      requiredPermissions: ['admin', 'editor', 'viewer'], // All roles can expand
+      canExpand: () => true, // All rows can be expanded
+    };
+    
     return result;
   },
 
