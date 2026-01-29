@@ -59,6 +59,10 @@
         :data="data" 
         :is-loading="isLoading"
         class="flex-1"
+        @bulk-edit="handleBulkEdit"
+        @bulk-archive="handleBulkArchive"
+        @bulk-delete="handleBulkDelete"
+        @export="handleExport"
       />
     </main>
   </div>
@@ -68,6 +72,7 @@
 import { computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuasar } from 'quasar'
 import { employeeLocalApi } from '@/lib/api/employee_local'
 import { useGridStore } from '@/lib/grid/store'
 import { useAuthStore } from '@/lib/auth/store'
@@ -78,6 +83,7 @@ import GridToolbar from '@/components/grid/GridToolbar.vue'
 const queryClient = useQueryClient()
 const gridStore = useGridStore()
 const authStore = useAuthStore()
+const $q = useQuasar()
 
 // Use storeToRefs to make store properties reactive
 const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
@@ -125,6 +131,99 @@ watch(data, (newData) => {
 watch([pageIndex, pageSize, searchText, filterBy], () => {
   queryClient.invalidateQueries({ queryKey: ["employees_local"] })
 })
+
+// Bulk action handlers
+const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<string, any> }) => {
+  try {
+    await employeeLocalApi.bulkEdit(data.selectedIds, data.updates)
+    
+    // Show success notification
+    $q.notify({
+      type: 'positive',
+      message: `Successfully updated ${data.selectedIds.length} employees`,
+      position: 'top'
+    })
+    
+    // Clear selection and refresh data
+    gridStore.setRowSelection({})
+    queryClient.invalidateQueries({ queryKey: ["employees_local"] })
+  } catch (error: any) {
+    console.error('Bulk edit error:', error)
+    $q.notify({
+      type: 'negative',
+      message: error.message || 'Failed to update employees',
+      position: 'top'
+    })
+  }
+}
+
+const handleBulkArchive = async (selectedIds: string[]) => {
+  try {
+    await employeeLocalApi.bulkArchive(selectedIds)
+    
+    // Show success notification
+    $q.notify({
+      type: 'positive',
+      message: `Successfully archived ${selectedIds.length} employees`,
+      position: 'top'
+    })
+    
+    // Clear selection and refresh data
+    gridStore.setRowSelection({})
+    queryClient.invalidateQueries({ queryKey: ["employees_local"] })
+  } catch (error: any) {
+    console.error('Bulk archive error:', error)
+    $q.notify({
+      type: 'negative',
+      message: error.message || 'Failed to archive employees',
+      position: 'top'
+    })
+  }
+}
+
+const handleBulkDelete = async (selectedIds: string[]) => {
+  try {
+    await employeeLocalApi.bulkDelete(selectedIds)
+    
+    // Show success notification
+    $q.notify({
+      type: 'positive',
+      message: `Successfully deleted ${selectedIds.length} employees`,
+      position: 'top'
+    })
+    
+    // Clear selection and refresh data
+    gridStore.setRowSelection({})
+    queryClient.invalidateQueries({ queryKey: ["employees_local"] })
+  } catch (error: any) {
+    console.error('Bulk delete error:', error)
+    $q.notify({
+      type: 'negative',
+      message: error.message || 'Failed to delete employees',
+      position: 'top'
+    })
+  }
+}
+
+const handleExport = async (selectedIds: string[]) => {
+  try {
+    await employeeLocalApi.exportSelected(selectedIds)
+    
+    // Show success notification
+    $q.notify({
+      type: 'positive',
+      message: `Successfully exported ${selectedIds.length} employees`,
+      position: 'top'
+    })
+  } catch (error: any) {
+    console.error('Export error:', error)
+    $q.notify({
+      type: 'negative',
+      message: error.message || 'Failed to export employees',
+      position: 'top'
+    })
+  }
+}
 </script>
 
 <style lang="sass" scoped>

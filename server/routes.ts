@@ -812,5 +812,226 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk operations for employee_local
+  app.patch("/api/employee_local/bulk/edit", async (req, res) => {
+    try {
+      const { selectedIds, updates } = req.body;
+      
+      if (!selectedIds || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+        return res.status(400).json({ error: "selectedIds array is required" });
+      }
+      
+      if (!updates || typeof updates !== 'object') {
+        return res.status(400).json({ error: "updates object is required" });
+      }
+      
+      console.log(`[API] Bulk edit request:`, { selectedIds, updates });
+      
+      const pool = getMySQLPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        let updatedCount = 0;
+        
+        for (const id of selectedIds) {
+          const employeeIdStr = id.split("-")[0];
+          
+          // Handle salary adjustment
+          if (updates._salaryAdjustment) {
+            const { type, value } = updates._salaryAdjustment;
+            let salaryUpdateQuery = "";
+            
+            if (type === 'percentage') {
+              salaryUpdateQuery = `UPDATE employees_temp SET salary = ROUND(salary * (1 + ? / 100), 2) WHERE employee_id = ?`;
+              await connection.execute(salaryUpdateQuery, [value, employeeIdStr]);
+            } else if (type === 'amount') {
+              salaryUpdateQuery = `UPDATE employees_temp SET salary = salary + ? WHERE employee_id = ?`;
+              await connection.execute(salaryUpdateQuery, [value, employeeIdStr]);
+            }
+            updatedCount++;
+          }
+          
+          // Handle regular field updates
+          for (const [field, value] of Object.entries(updates)) {
+            if (field === '_salaryAdjustment') continue;
+            
+            const allowedFields = ['first_name', 'last_name', 'email', 'department', 'job_title', 'salary', 'hire_date'];
+            if (!allowedFields.includes(field)) continue;
+            
+            const updateQuery = `UPDATE employees_temp SET ${field} = ? WHERE employee_id = ?`;
+            await connection.execute(updateQuery, [value, employeeIdStr]);
+            updatedCount++;
+          }
+        }
+        
+        res.json({ 
+          success: true, 
+          message: `Successfully updated ${selectedIds.length} employees`,
+          updatedCount: selectedIds.length
+        });
+      } finally {
+        connection.release();
+      }
+    } catch (error: any) {
+      console.error("[API] Error in bulk edit:", error);
+      res.status(500).json({ 
+        error: "Failed to bulk edit employees", 
+        message: error.message 
+      });
+    }
+  });
+
+  app.patch("/api/employee_local/bulk/archive", async (req, res) => {
+    try {
+      const { selectedIds } = req.body;
+      
+      if (!selectedIds || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+        return res.status(400).json({ error: "selectedIds array is required" });
+      }
+      
+      console.log(`[API] Bulk archive request:`, { selectedIds });
+      
+      const pool = getMySQLPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        // Add archived status or move to archive table
+        // For now, we'll add an 'archived' field or update status
+        for (const id of selectedIds) {
+          const employeeIdStr = id.split("-")[0];
+          
+          // Try to add archived column if it doesn't exist
+          try {
+            await connection.execute(`ALTER TABLE employees_temp ADD COLUMN archived BOOLEAN DEFAULT FALSE`);
+          } catch (e) {
+            // Column might already exist, ignore error
+          }
+          
+          const updateQuery = `UPDATE employees_temp SET archived = TRUE WHERE employee_id = ?`;
+          await connection.execute(updateQuery, [employeeIdStr]);
+        }
+        
+        res.json({ 
+          success: true, 
+          message: `Successfully archived ${selectedIds.length} employees`,
+          archivedCount: selectedIds.length
+        });
+      } finally {
+        connection.release();
+      }
+    } catch (error: any) {
+      console.error("[API] Error in bulk archive:", error);
+      res.status(500).json({ 
+        error: "Failed to archive employees", 
+        message: error.message 
+      });
+    }
+  });
+
+  app.delete("/api/employee_local/bulk/delete", async (req, res) => {
+    try {
+      const { selectedIds } = req.body;
+      
+      if (!selectedIds || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+        return res.status(400).json({ error: "selectedIds array is required" });
+      }
+      
+      console.log(`[API] Bulk delete request:`, { selectedIds });
+      
+      const pool = getMySQLPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        let deletedCount = 0;
+        
+        for (const id of selectedIds) {
+          const employeeIdStr = id.split("-")[0];
+          
+          const deleteQuery = `DELETE FROM employees_temp WHERE employee_id = ?`;
+          const [result] = await connection.execute(deleteQuery, [employeeIdStr]) as any;
+          
+          if (result.affectedRows > 0) {
+            deletedCount++;
+          }
+        }
+        
+        res.json({ 
+          success: true, 
+          message: `Successfully deleted ${deletedCount} employees`,
+          deletedCount
+        });
+      } finally {
+        connection.release();
+      }
+    } catch (error: any) {
+      console.error("[API] Error in bulk delete:", error);
+      res.status(500).json({ 
+        error: "Failed to delete employees", 
+        message: error.message 
+      });
+    }
+  });
+
+  app.post("/api/employee_local/export", async (req, res) => {
+    try {
+      const { selectedIds } = req.body;
+      
+      if (!selectedIds || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+        return res.status(400).json({ error: "selectedIds array is required" });
+      }
+      
+      console.log(`[API] Export request:`, { selectedIds });
+      
+      const pool = getMySQLPool();
+      const connection = await pool.getConnection();
+      
+      try {
+        const employeeIds = selectedIds.map(id => id.split("-")[0]);
+        const placeholders = employeeIds.map(() => '?').join(',');
+        
+        const query = `
+          SELECT employee_id, first_name, last_name, email, department, job_title, salary, hire_date
+          FROM employees_temp 
+          WHERE employee_id IN (${placeholders})
+          ORDER BY employee_id
+        `;
+        
+        const [rows] = await connection.execute(query, employeeIds) as any;
+        
+        // Generate CSV
+        const headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Department', 'Job Title', 'Salary', 'Hire Date'];
+        const csvRows = [headers.join(',')];
+        
+        rows.forEach((row: any) => {
+          const values = [
+            row.employee_id,
+            `"${row.first_name || ''}"`,
+            `"${row.last_name || ''}"`,
+            `"${row.email || ''}"`,
+            `"${row.department || ''}"`,
+            `"${row.job_title || ''}"`,
+            row.salary || '',
+            row.hire_date || ''
+          ];
+          csvRows.push(values.join(','));
+        });
+        
+        const csvContent = csvRows.join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="employees_export_${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send(csvContent);
+      } finally {
+        connection.release();
+      }
+    } catch (error: any) {
+      console.error("[API] Error in export:", error);
+      res.status(500).json({ 
+        error: "Failed to export employees", 
+        message: error.message 
+      });
+    }
+  });
+
   return httpServer;
 }

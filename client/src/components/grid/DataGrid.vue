@@ -172,11 +172,20 @@
         @update:model-value="(value) => gridStore.setPageIndex(value - 1)"
       />
     </div>
+
+    <!-- Bulk Actions Bar -->
+    <BulkActionsBar
+      :columns="props.data?.columns || []"
+      @bulk-edit="handleBulkEdit"
+      @bulk-archive="handleBulkArchive"
+      @bulk-delete="handleBulkDelete"
+      @export="handleExport"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, toRefs, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   useVueTable,
@@ -192,10 +201,18 @@ import { DataResult, ColumnConfig } from '@/lib/grid/types'
 import EditableCell from './cells/EditableCell.vue'
 import ExpanderCell from './cells/ExpanderCell.vue'
 import DetailPanel from './cells/DetailPanel.vue'
+import BulkActionsBar from './BulkActionsBar.vue'
 
 const props = defineProps<{
   data: DataResult
   isLoading?: boolean
+}>()
+
+const emit = defineEmits<{
+  bulkEdit: [data: { selectedIds: string[], updates: Record<string, any> }]
+  bulkArchive: [selectedIds: string[]]
+  bulkDelete: [selectedIds: string[]]
+  export: [selectedIds: string[]]
 }>()
 
 const tableContainerRef = ref<HTMLDivElement>()
@@ -363,10 +380,23 @@ const table = useVueTable({
     let newState: Record<string, boolean>
     
     if (typeof updater === 'function') {
-      newState = updater(expandedRows.value)
+      const currentState = expandedRows.value
+      const result = updater(currentState)
+      
+      // Handle both boolean (expand all) and object (specific rows) results
+      if (typeof result === 'boolean') {
+        newState = result ? Object.fromEntries(props.data?.rows?.map(row => [row.id, true]) || []) : {}
+      } else {
+        newState = result as Record<string, boolean>
+      }
       console.log('[TABLE] New expanded state from updater:', newState)
     } else {
-      newState = updater
+      // Handle both boolean and object direct updates
+      if (typeof updater === 'boolean') {
+        newState = updater ? Object.fromEntries(props.data?.rows?.map(row => [row.id, true]) || []) : {}
+      } else {
+        newState = updater as Record<string, boolean>
+      }
       console.log('[TABLE] Direct state update:', updater)
     }
     
@@ -584,6 +614,23 @@ watch(pageIndex, () => {
     gridStore.cleanupExpandedRows(validRowIds)
   }
 })
+
+// Bulk action handlers
+const handleBulkEdit = (data: { selectedIds: string[], updates: Record<string, any> }) => {
+  emit('bulkEdit', data)
+}
+
+const handleBulkArchive = (selectedIds: string[]) => {
+  emit('bulkArchive', selectedIds)
+}
+
+const handleBulkDelete = (selectedIds: string[]) => {
+  emit('bulkDelete', selectedIds)
+}
+
+const handleExport = (selectedIds: string[]) => {
+  emit('export', selectedIds)
+}
 </script>
 
 <style lang="sass" scoped>
