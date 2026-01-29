@@ -1,29 +1,33 @@
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { DataResult } from "@/lib/grid/types";
-import { employeeLocalApi } from "@/lib/api/employee_local";
+import { createGridApi } from "@/lib/api/generic-grid";
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 
 // Global state to track which cell is currently being updated
 const updatingCells = ref(new Set<string>());
 
-export function useGridUpdate() {
+export function useGridUpdate(gridId: string = 'employees') {
   const queryClient = useQueryClient();
   const $q = useQuasar();
 
+  // Create API instance for the specific grid
+  const gridApi = createGridApi({ gridId });
+
   const mutation = useMutation({
-    mutationFn: employeeLocalApi.updateField,
+    mutationFn: gridApi.updateField,
     onMutate: async ({ rowId, columnId, value }) => {
       // Track this specific cell as updating
       const cellKey = `${rowId}-${columnId}`;
       updatingCells.value.add(cellKey);
 
-      // Cancel any outgoing refetches for all employees_local queries
-      await queryClient.cancelQueries({ queryKey: ["employees_local"] });
+      // Cancel any outgoing refetches for this grid's queries
+      const queryKey = `${gridId}_generic`;
+      await queryClient.cancelQueries({ queryKey: [queryKey] });
 
       // Get all matching query data and update them optimistically
       const queryCache = queryClient.getQueryCache();
-      const queries = queryCache.findAll({ queryKey: ["employees_local"] });
+      const queries = queryCache.findAll({ queryKey: [queryKey] });
       
       const previousDataMap = new Map();
       

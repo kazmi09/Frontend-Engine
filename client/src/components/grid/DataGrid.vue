@@ -123,6 +123,8 @@
                 :row-id="row.original.id"
                 :column-count="row.getVisibleCells().length"
                 :expandable-config="props.data.expandable!"
+                :columns="props.data.columns"
+                :grid-id="getGridIdFromData()"
                 @retry="handleRetryDetailLoad"
               >
                 <template #default="slotProps">
@@ -630,6 +632,13 @@ const handleBulkDelete = (selectedIds: string[]) => {
 
 const handleExport = (selectedIds: string[]) => {
   emit('export', selectedIds)
+}
+
+// Helper function to get grid ID from data
+const getGridIdFromData = () => {
+  // Try to extract grid ID from the data structure
+  // This could be improved by passing it as a prop
+  return props.data?.gridId || 'default'
 }
 </script>
 

@@ -3,8 +3,7 @@
     <!-- Top Navigation -->
     <header class="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
       <div class="flex items-center gap-4">
-        <q-icon name="dashboard" size="md" class="text-primary" />
-        <!--<h1 class="text-xl font-semibold">Enterprise Data Grid</h1>-->
+        <q-icon name="people" size="md" class="text-primary" />
       </div>
       
       <div class="flex items-center gap-2">
@@ -21,28 +20,11 @@
         
         <q-btn
           flat
-          icon="comment"
-          label="View Comments Grid"
-          @click="$router.push('/comments')"
-          class="text-blue-600"
-        >
-          <q-tooltip>Demo: External API Grid</q-tooltip>
-        </q-btn>
-        
-        <q-select
-          v-model="currentRole"
-          :options="roleOptions"
-          dense
-          outlined
-          emit-value
-          map-options
-          style="min-width: 120px"
-          @update:model-value="authStore.setUserRole"
-        >
-          <template v-slot:prepend>
-            <q-icon name="person" />
-          </template>
-        </q-select>
+          icon="arrow_back"
+          label="Back to Employees"
+          @click="$router.push('/')"
+          class="text-gray-600"
+        />
       </div>
     </header>
 
@@ -84,139 +66,102 @@ import { storeToRefs } from 'pinia'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useQuasar } from 'quasar'
 import { createGridApi } from '@/lib/api/generic-grid'
-import GenericDetailPanel from '@/components/grid/GenericDetailPanel.vue'
 import { useGridStore } from '@/lib/grid/store'
-import { useAuthStore } from '@/lib/auth/store'
 import { DataResult } from '@/lib/grid/types'
 import DataGrid from '@/components/grid/DataGrid.vue'
 import GridToolbar from '@/components/grid/GridToolbar.vue'
+import GenericDetailPanel from '@/components/grid/GenericDetailPanel.vue'
 
 const queryClient = useQueryClient()
 const gridStore = useGridStore()
-const authStore = useAuthStore()
 const $q = useQuasar()
-
-// Create generic API for employees grid
-const employeeApi = createGridApi({ 
-  gridId: 'employees',
-  expandableComponent: GenericDetailPanel
-})
 
 // Use storeToRefs to make store properties reactive
 const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
-const { user } = storeToRefs(authStore)
 
-// Role management
-const currentRole = computed({
-  get: () => user.value.role,
-  set: (value) => authStore.setUserRole(value)
+// Create generic API for users grid (DummyJSON API)
+const usersApi = createGridApi({ 
+  gridId: 'users',
+  expandableComponent: GenericDetailPanel
 })
 
-const roleOptions = [
-  { label: 'Admin', value: 'admin' },
-  { label: 'Editor', value: 'editor' },
-  { label: 'Viewer', value: 'viewer' }
-]
-
-// React Query: fetch employees with server-side pagination, search, and filtering
-console.log('Setting up query with params:', {
-  pageIndex: pageIndex.value,
-  pageSize: pageSize.value,
-  searchText: searchText.value,
-  filterBy: filterBy.value
-})
-
+// React Query: fetch users with client-side pagination and search
 const { data, isLoading, isRefetching, refetch, error } = useQuery<DataResult, Error>({
   queryKey: computed(() => {
-    const key = ["employees_generic", pageIndex.value, pageSize.value, searchText.value, filterBy.value]
-    console.log('Query key:', key)
+    const key = ["users_generic", pageIndex.value, pageSize.value, searchText.value, filterBy.value]
+    console.log('Users query key:', key)
     return key
   }),
   queryFn: () => {
-    console.log('Executing query function...')
-    return employeeApi.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
+    console.log('Executing users query function...')
+    return usersApi.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
   },
   staleTime: 60_000,
 })
 
 // Debug logging
 watch(data, (newData) => {
-  console.log('Dashboard received data:', newData)
+  console.log('Users page received data:', newData)
 }, { immediate: true })
 
-// Invalidate cache when pagination, search, or filter changes to ensure fresh data
+// Invalidate cache when pagination, search, or filter changes
 watch([pageIndex, pageSize, searchText, filterBy], () => {
-  queryClient.invalidateQueries({ queryKey: ["employees_generic"] })
+  queryClient.invalidateQueries({ queryKey: ["users_generic"] })
 })
 
 // Bulk action handlers
 const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<string, any> }) => {
   try {
-    await employeeApi.bulkEdit(data.selectedIds, data.updates)
+    await usersApi.bulkEdit(data.selectedIds, data.updates)
     
     // Show success notification
     $q.notify({
       type: 'positive',
-      message: `Successfully updated ${data.selectedIds.length} employees`,
+      message: `Successfully updated ${data.selectedIds.length} users`,
       position: 'top'
     })
     
     // Clear selection and refresh data
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: ["employees_generic"] })
+    queryClient.invalidateQueries({ queryKey: ["users_generic"] })
   } catch (error: any) {
     console.error('Bulk edit error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to update employees',
+      message: error.message || 'Failed to update users',
       position: 'top'
     })
   }
 }
 
 const handleBulkArchive = async (selectedIds: string[]) => {
-  try {
-    await employeeApi.bulkArchive(selectedIds)
-    
-    // Show success notification
-    $q.notify({
-      type: 'positive',
-      message: `Successfully archived ${selectedIds.length} employees`,
-      position: 'top'
-    })
-    
-    // Clear selection and refresh data
-    gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: ["employees_generic"] })
-  } catch (error: any) {
-    console.error('Bulk archive error:', error)
-    $q.notify({
-      type: 'negative',
-      message: error.message || 'Failed to archive employees',
-      position: 'top'
-    })
-  }
+  // DummyJSON doesn't support archiving, show info message
+  $q.notify({
+    type: 'info',
+    message: 'Archive functionality not supported by DummyJSON API',
+    position: 'top'
+  })
 }
 
 const handleBulkDelete = async (selectedIds: string[]) => {
   try {
-    await employeeApi.bulkDelete(selectedIds)
+    await usersApi.bulkDelete(selectedIds)
     
     // Show success notification
     $q.notify({
       type: 'positive',
-      message: `Successfully deleted ${selectedIds.length} employees`,
+      message: `Successfully deleted ${selectedIds.length} users`,
       position: 'top'
     })
     
     // Clear selection and refresh data
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: ["employees_generic"] })
+    queryClient.invalidateQueries({ queryKey: ["users_generic"] })
   } catch (error: any) {
     console.error('Bulk delete error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to delete employees',
+      message: error.message || 'Failed to delete users',
       position: 'top'
     })
   }
@@ -224,19 +169,19 @@ const handleBulkDelete = async (selectedIds: string[]) => {
 
 const handleExport = async (selectedIds: string[]) => {
   try {
-    await employeeApi.exportSelected(selectedIds)
+    await usersApi.exportSelected(selectedIds)
     
     // Show success notification
     $q.notify({
       type: 'positive',
-      message: `Successfully exported ${selectedIds.length} employees`,
+      message: `Successfully exported ${selectedIds.length} users`,
       position: 'top'
     })
   } catch (error: any) {
     console.error('Export error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to export employees',
+      message: error.message || 'Failed to export users',
       position: 'top'
     })
   }

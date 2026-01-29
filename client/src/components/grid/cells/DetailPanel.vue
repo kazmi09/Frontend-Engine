@@ -41,6 +41,8 @@
             :is="rendererComponent"
             :row="row"
             :rowId="rowId"
+            :columns="columns"
+            :gridId="gridId"
             :data="detailData"
           />
         </div>
@@ -59,6 +61,8 @@ const props = defineProps<{
   rowId: string;
   columnCount: number;
   expandableConfig: ExpandableConfig;
+  columns?: any[];
+  gridId?: string;
 }>();
 
 const emit = defineEmits<{
