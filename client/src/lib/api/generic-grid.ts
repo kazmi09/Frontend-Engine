@@ -55,6 +55,8 @@ export function createGridApi(config: GridApiConfig) {
 
       const result = await response.json();
       console.log(`[${gridId}] API Response:`, result)
+      console.log(`[${gridId}] API Response gridId:`, result.gridId)
+      console.log(`[${gridId}] API Response primaryKey:`, result.primaryKey)
       
       // Add expandable component if provided
       if (expandableComponent && result.expandable) {

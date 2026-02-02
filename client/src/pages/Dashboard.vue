@@ -21,13 +21,27 @@
         
         <q-btn
           flat
-          icon="comment"
-          label="View Comments Grid"
-          @click="$router.push('/comments')"
+          icon="people"
+          label="Users"
+          @click="$router.push('/grid/users')"
           class="text-blue-600"
-        >
-          <q-tooltip>Demo: External API Grid</q-tooltip>
-        </q-btn>
+        />
+        
+        <q-btn
+          flat
+          icon="dashboard"
+          label="Employees"
+          @click="$router.push('/grid/employees')"
+          class="text-green-600"
+        />
+        
+        <q-btn
+          flat
+          icon="inventory"
+          label="Products"
+          @click="$router.push('/grid/products')"
+          class="text-purple-600"
+        />
         
         <q-select
           v-model="currentRole"
@@ -47,7 +61,10 @@
     </header>
 
     <!-- Grid Toolbar -->
-    <GridToolbar :columns="data?.columns" />
+    <GridToolbar 
+      :columns="data?.columns" 
+      @column-visibility-changed="handleColumnVisibilityChanged"
+    />
 
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col overflow-hidden">
@@ -86,6 +103,7 @@ import { useQuasar } from 'quasar'
 import { createGridApi } from '@/lib/api/generic-grid'
 import GenericDetailPanel from '@/components/grid/GenericDetailPanel.vue'
 import { useGridStore } from '@/lib/grid/store'
+import { useGridStateStore } from '@/stores/gridState'
 import { useAuthStore } from '@/lib/auth/store'
 import { DataResult } from '@/lib/grid/types'
 import DataGrid from '@/components/grid/DataGrid.vue'
@@ -93,6 +111,7 @@ import GridToolbar from '@/components/grid/GridToolbar.vue'
 
 const queryClient = useQueryClient()
 const gridStore = useGridStore()
+const gridStateStore = useGridStateStore()
 const authStore = useAuthStore()
 const $q = useQuasar()
 
@@ -150,6 +169,16 @@ watch([pageIndex, pageSize, searchText, filterBy], () => {
 })
 
 // Bulk action handlers
+const handleColumnVisibilityChanged = (visibility: Record<string, boolean>) => {
+  console.log('[Dashboard] Column visibility changed from toolbar:', visibility)
+  
+  // Persist to gridState store - use 'employees' as gridId
+  const gridId = 'employees'
+  Object.keys(visibility).forEach(columnId => {
+    gridStateStore.updateColumnVisibility(gridId, columnId, visibility[columnId])
+  })
+}
+
 const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<string, any> }) => {
   try {
     await employeeApi.bulkEdit(data.selectedIds, data.updates)

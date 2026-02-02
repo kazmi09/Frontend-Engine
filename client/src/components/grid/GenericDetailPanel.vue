@@ -114,6 +114,171 @@
       </div>
     </div>
 
+    <!-- Custom Fields Section -->
+    <div v-if="config.enableCustomFields !== false" class="custom-fields-section">
+      <!-- Display existing custom fields -->
+      <div 
+        v-for="field in customFields" 
+        :key="field.id"
+        class="detail-field"
+      >
+        <div class="field-label-row">
+          <label class="field-label">{{ field.label }}</label>
+          <q-btn
+            flat
+            dense
+            round
+            size="xs"
+            icon="close"
+            class="delete-field-btn"
+            @click="removeCustomFieldHandler(field.id)"
+          >
+            <q-tooltip>Remove field</q-tooltip>
+          </q-btn>
+        </div>
+        <div 
+          class="field-value editable"
+          @click="startEditCustom(field.id)"
+        >
+          <template v-if="editingCustomField === field.id">
+            <!-- Text Input -->
+            <input
+              v-if="field.type === 'text'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="text"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+            
+            <!-- Number Input -->
+            <input
+              v-else-if="field.type === 'number'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="number"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+            
+            <!-- Email Input -->
+            <input
+              v-else-if="field.type === 'email'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="email"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+            
+            <!-- Phone Input -->
+            <input
+              v-else-if="field.type === 'tel'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="tel"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+            
+            <!-- Date Input -->
+            <input
+              v-else-if="field.type === 'date'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="date"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+            
+            <!-- URL Input -->
+            <input
+              v-else-if="field.type === 'url'"
+              :ref="el => customFieldRefs[field.id] = el"
+              v-model="editValues[field.id]"
+              type="url"
+              class="field-input"
+              @blur="saveCustomField(field.id)"
+              @keydown.enter="saveCustomField(field.id)"
+              @keydown.escape="cancelEditCustom"
+            />
+          </template>
+          
+          <template v-else>
+            <span class="field-text">{{ field.value || 'N/A' }}</span>
+            <q-icon name="edit" size="xs" class="edit-icon" />
+          </template>
+        </div>
+      </div>
+      
+      <!-- Add Custom Field Section -->
+      <div class="add-field-section">
+        <div v-if="!showAddFieldForm" class="add-field-trigger">
+          <q-btn
+            flat
+            icon="add"
+            label="Add Custom Field"
+            color="primary"
+            size="sm"
+            @click="showAddFieldForm = true"
+            data-test="add-custom-field-btn"
+          />
+        </div>
+        
+        <div v-else class="add-field-form" data-test="add-field-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label class="form-label">Field Name</label>
+              <input
+                v-model="newFieldLabel"
+                type="text"
+                class="form-input"
+                placeholder="e.g., Phone Number"
+                data-test="field-label-input"
+                @keydown.enter="addCustomFieldHandler"
+              />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Field Type</label>
+              <select v-model="newFieldType" class="form-select">
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="email">Email</option>
+                <option value="tel">Phone</option>
+                <option value="date">Date</option>
+                <option value="url">URL</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <q-btn
+              flat
+              label="Cancel"
+              size="sm"
+              @click="showAddFieldForm = false; newFieldLabel = ''; newFieldType = 'text'"
+            />
+            <q-btn
+              unelevated
+              label="Add Field"
+              color="primary"
+              size="sm"
+              @click="addCustomFieldHandler"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading/Saving Indicator -->
     <div v-if="isSaving" class="saving-indicator">
       <q-spinner size="16px" color="primary" />
@@ -135,8 +300,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick, computed } from 'vue'
+import { ref, reactive, nextTick, computed, watch } from 'vue'
 import { useGridUpdate } from '@/composables/useGridUpdate'
+import { useCustomFields, CustomField } from '@/composables/useCustomFields'
 import { ColumnConfig } from '@/lib/grid/types'
 
 interface DetailPanelConfig {
@@ -146,6 +312,7 @@ interface DetailPanelConfig {
   titleField?: string
   subtitleField?: string
   idField?: string
+  enableCustomFields?: boolean
 }
 
 const props = defineProps<{
@@ -157,6 +324,31 @@ const props = defineProps<{
 }>()
 
 const updateMutation = useGridUpdate(props.gridId || 'default')
+
+// Custom fields integration
+const {
+  customFields,
+  addCustomField: addField,
+  updateCustomField,
+  removeCustomField: removeField,
+  loadCustomFields
+} = useCustomFields({
+  rowId: props.rowId,
+  gridId: props.gridId || 'default'
+})
+
+// Watch for rowId changes and reload custom fields
+watch(() => props.rowId, (newRowId) => {
+  console.log('[GenericDetailPanel] Row ID changed, reloading custom fields for:', newRowId)
+  loadCustomFields(newRowId)
+}, { immediate: false })
+
+// Custom field form state
+const showAddFieldForm = ref(false)
+const newFieldLabel = ref('')
+const newFieldType = ref<CustomField['type']>('text')
+const editingCustomField = ref<string | null>(null)
+const customFieldRefs = reactive<Record<string, any>>({})
 
 const editingField = ref<string | null>(null)
 const editValues = reactive<Record<string, any>>({})
@@ -173,6 +365,7 @@ const config = computed(() => ({
   titleField: 'name',
   subtitleField: 'type',
   idField: 'id',
+  enableCustomFields: true,
   ...props.config
 }))
 
@@ -317,6 +510,67 @@ const saveField = async (fieldName: string) => {
   } finally {
     isSaving.value = false
   }
+}
+
+// Custom field handlers
+const addCustomFieldHandler = () => {
+  if (!newFieldLabel.value.trim()) {
+    saveError.value = 'Field name cannot be empty'
+    setTimeout(() => saveError.value = null, 2000)
+    return
+  }
+  
+  try {
+    addField(newFieldLabel.value, newFieldType.value)
+    
+    // Reset form
+    newFieldLabel.value = ''
+    newFieldType.value = 'text'
+    showAddFieldForm.value = false
+    
+    // Show success message
+    successMessage.value = 'Custom field added!'
+    setTimeout(() => successMessage.value = null, 2000)
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : 'Failed to add field'
+    setTimeout(() => saveError.value = null, 2000)
+  }
+}
+
+const removeCustomFieldHandler = (fieldId: string) => {
+  removeField(fieldId)
+  successMessage.value = 'Field removed'
+  setTimeout(() => successMessage.value = null, 2000)
+}
+
+const startEditCustom = (fieldId: string) => {
+  const field = customFields.value.find(f => f.id === fieldId)
+  if (!field) return
+  
+  editingCustomField.value = fieldId
+  editValues[fieldId] = field.value
+  saveError.value = null
+  
+  nextTick(() => {
+    const element = customFieldRefs[fieldId]
+    if (element && element.focus) {
+      element.focus()
+    }
+  })
+}
+
+const saveCustomField = (fieldId: string) => {
+  const newValue = editValues[fieldId]
+  updateCustomField(fieldId, newValue)
+  editingCustomField.value = null
+  
+  successMessage.value = 'Field updated!'
+  setTimeout(() => successMessage.value = null, 2000)
+}
+
+const cancelEditCustom = () => {
+  editingCustomField.value = null
+  saveError.value = null
 }
 </script>
 
@@ -497,5 +751,88 @@ const saveField = async (fieldName: string) => {
   border-radius: 4px;
   font-size: 12px;
   color: #166534;
+}
+
+/* Custom Fields Section */
+.custom-fields-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-field-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: #ef4444;
+}
+
+.detail-field:hover .delete-field-btn {
+  opacity: 1;
+}
+
+.add-field-section {
+  margin-top: 12px;
+}
+
+.add-field-trigger {
+  display: flex;
+  justify-content: center;
+}
+
+.add-field-form {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input,
+.form-select {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1f2937;
+  background: white;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

@@ -19,16 +19,26 @@ export class GenericGridService {
   async getData(params: QueryParams): Promise<DataResult> {
     const queryResult = await this.queryBuilder.executeQuery(params)
     
+    // Determine primary key based on data source type
+    let primaryKey = 'id' // default
+    if (this.config.dataSource.type === 'mysql' && this.config.dataSource.connection) {
+      primaryKey = this.config.dataSource.connection.primaryKey
+    } else if (this.config.dataSource.type === 'api') {
+      // For API sources, use 'id' as default (can be customized per grid)
+      primaryKey = 'id'
+    }
+    
     // Transform to DataResult format
     const result: DataResult = {
-      primaryKey: this.config.dataSource.connection?.primaryKey || 'id',
+      primaryKey,
       columns: this.config.columns,
       rows: queryResult.rows,
       pagination: {
         pageIndex: queryResult.pageIndex,
         pageSize: queryResult.pageSize,
         totalRows: queryResult.totalRows,
-      }
+      },
+      gridId: this.config.id
     }
 
     // Add expandable configuration if enabled

@@ -3,7 +3,8 @@
     <!-- Top Navigation -->
     <header class="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
       <div class="flex items-center gap-4">
-        <q-icon name="people" size="md" class="text-primary" />
+        <q-icon :name="gridIcon" size="md" class="text-primary" />
+        <h1 class="text-xl font-semibold">{{ gridTitle }}</h1>
       </div>
       
       <div class="flex items-center gap-2">
@@ -21,8 +22,8 @@
         <q-btn
           flat
           icon="arrow_back"
-          label="Back to Employees"
-          @click="$router.push('/')"
+          label="Back"
+          @click="$router.back()"
           class="text-gray-600"
         />
       </div>
@@ -65,6 +66,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useQuasar } from 'quasar'
@@ -76,107 +78,115 @@ import DataGrid from '@/components/grid/DataGrid.vue'
 import GridToolbar from '@/components/grid/GridToolbar.vue'
 import GenericDetailPanel from '@/components/grid/GenericDetailPanel.vue'
 
+const route = useRoute()
 const queryClient = useQueryClient()
 const gridStore = useGridStore()
 const gridStateStore = useGridStateStore()
 const $q = useQuasar()
 
+// Get gridId from route parameter
+const gridId = computed(() => route.params.gridId as string)
+
+// Grid metadata (you could fetch this from an API or config)
+const gridMetadata = computed(() => {
+  const metadata: Record<string, { title: string; icon: string }> = {
+    employees: { title: 'Employees', icon: 'people' },
+    users: { title: 'Users', icon: 'person' },
+    products: { title: 'Products', icon: 'inventory' },
+    orders: { title: 'Orders', icon: 'shopping_cart' },
+    customers: { title: 'Customers', icon: 'business' }
+  }
+  return metadata[gridId.value] || { title: gridId.value, icon: 'table_chart' }
+})
+
+const gridTitle = computed(() => gridMetadata.value.title)
+const gridIcon = computed(() => gridMetadata.value.icon)
+
+// Create generic API for current grid
+const gridApi = computed(() => createGridApi({ 
+  gridId: gridId.value,
+  expandableComponent: GenericDetailPanel
+}))
+
 // Use storeToRefs to make store properties reactive
 const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
 
-// Create generic API for users grid (DummyJSON API)
-const usersApi = createGridApi({ 
-  gridId: 'users',
-  expandableComponent: GenericDetailPanel
-})
-
-// React Query: fetch users with client-side pagination and search
+// React Query: fetch data for current grid
 const { data, isLoading, isRefetching, refetch, error } = useQuery<DataResult, Error>({
   queryKey: computed(() => {
-    const key = ["users_generic", pageIndex.value, pageSize.value, searchText.value, filterBy.value]
-    console.log('Users query key:', key)
-    return key
+    return [`${gridId.value}_generic`, pageIndex.value, pageSize.value, searchText.value, filterBy.value]
   }),
   queryFn: () => {
-    console.log('Executing users query function...')
-    return usersApi.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
+    return gridApi.value.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
   },
   staleTime: 60_000,
 })
 
-// Debug logging
-watch(data, (newData) => {
-  console.log('Users page received data:', newData)
-}, { immediate: true })
-
 // Invalidate cache when pagination, search, or filter changes
 watch([pageIndex, pageSize, searchText, filterBy], () => {
-  queryClient.invalidateQueries({ queryKey: ["users_generic"] })
+  queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
 })
 
-// Bulk action handlers
+// Column visibility handler
 const handleColumnVisibilityChanged = (visibility: Record<string, boolean>) => {
-  console.log('[Users] Column visibility changed from toolbar:', visibility)
-  
-  // Persist to gridState store - use 'users' as gridId
-  const gridId = 'users'
   Object.keys(visibility).forEach(columnId => {
-    gridStateStore.updateColumnVisibility(gridId, columnId, visibility[columnId])
+    gridStateStore.updateColumnVisibility(gridId.value, columnId, visibility[columnId])
   })
 }
 
+// Bulk action handlers
 const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<string, any> }) => {
   try {
-    await usersApi.bulkEdit(data.selectedIds, data.updates)
-    
-    // Show success notification
+    await gridApi.value.bulkEdit(data.selectedIds, data.updates)
     $q.notify({
       type: 'positive',
-      message: `Successfully updated ${data.selectedIds.length} users`,
+      message: `Successfully updated ${data.selectedIds.length} records`,
       position: 'top'
     })
-    
-    // Clear selection and refresh data
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: ["users_generic"] })
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
   } catch (error: any) {
-    console.error('Bulk edit error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to update users',
+      message: error.message || 'Failed to update records',
       position: 'top'
     })
   }
 }
 
 const handleBulkArchive = async (selectedIds: string[]) => {
-  // DummyJSON doesn't support archiving, show info message
-  $q.notify({
-    type: 'info',
-    message: 'Archive functionality not supported by DummyJSON API',
-    position: 'top'
-  })
+  try {
+    await gridApi.value.bulkArchive(selectedIds)
+    $q.notify({
+      type: 'positive',
+      message: `Successfully archived ${selectedIds.length} records`,
+      position: 'top'
+    })
+    gridStore.setRowSelection({})
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
+  } catch (error: any) {
+    $q.notify({
+      type: 'negative',
+      message: error.message || 'Failed to archive records',
+      position: 'top'
+    })
+  }
 }
 
 const handleBulkDelete = async (selectedIds: string[]) => {
   try {
-    await usersApi.bulkDelete(selectedIds)
-    
-    // Show success notification
+    await gridApi.value.bulkDelete(selectedIds)
     $q.notify({
       type: 'positive',
-      message: `Successfully deleted ${selectedIds.length} users`,
+      message: `Successfully deleted ${selectedIds.length} records`,
       position: 'top'
     })
-    
-    // Clear selection and refresh data
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: ["users_generic"] })
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
   } catch (error: any) {
-    console.error('Bulk delete error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to delete users',
+      message: error.message || 'Failed to delete records',
       position: 'top'
     })
   }
@@ -184,26 +194,18 @@ const handleBulkDelete = async (selectedIds: string[]) => {
 
 const handleExport = async (selectedIds: string[]) => {
   try {
-    await usersApi.exportSelected(selectedIds)
-    
-    // Show success notification
+    await gridApi.value.exportSelected(selectedIds)
     $q.notify({
       type: 'positive',
-      message: `Successfully exported ${selectedIds.length} users`,
+      message: `Successfully exported ${selectedIds.length} records`,
       position: 'top'
     })
   } catch (error: any) {
-    console.error('Export error:', error)
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to export users',
+      message: error.message || 'Failed to export records',
       position: 'top'
     })
   }
 }
 </script>
-
-<style lang="sass" scoped>
-.q-page
-  min-height: 100vh
-</style>

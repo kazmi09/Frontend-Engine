@@ -281,6 +281,72 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
       enabled: true,
       filterableColumns: ['gender', 'role', 'bloodGroup', 'eyeColor']
     }
+  },
+
+  // DummyJSON Products API - Example of another dataset
+  products: {
+    id: 'products',
+    name: 'Products',
+    description: 'Product catalog from DummyJSON API',
+    dataSource: {
+      type: 'api',
+      api: {
+        baseUrl: 'https://dummyjson.com',
+        endpoints: {
+          list: '/products',
+          get: '/products/{id}',
+          create: '/products/add',
+          update: '/products/{id}',
+          delete: '/products/{id}'
+        }
+      }
+    },
+    columns: [
+      { id: "id", label: "ID", type: "number", width: 80, editable: false },
+      { id: "title", label: "Product Name", type: "string", width: 250, editable: true },
+      { id: "brand", label: "Brand", type: "string", width: 150, editable: true },
+      { id: "category", label: "Category", type: "string", width: 150, editable: true },
+      { id: "price", label: "Price", type: "number", width: 100, editable: true },
+      { id: "stock", label: "Stock", type: "number", width: 100, editable: true },
+      { id: "rating", label: "Rating", type: "number", width: 100, editable: false }
+    ],
+    expandable: {
+      enabled: true,
+      component: 'GenericDetailPanel',
+      requiredPermissions: ['admin', 'editor', 'viewer'],
+      canExpand: '() => true',
+      singleExpand: false,
+      defaultExpanded: false,
+      lazyLoad: false
+    },
+    bulkActions: {
+      enabled: true,
+      actions: {
+        edit: true,
+        delete: true,
+        archive: false,
+        export: true
+      }
+    },
+    permissions: {
+      read: ['admin', 'editor', 'viewer'],
+      create: ['admin', 'editor'],
+      update: ['admin', 'editor'],
+      delete: ['admin']
+    },
+    pagination: {
+      enabled: true,
+      defaultPageSize: 20,
+      pageSizeOptions: [10, 20, 30, 50]
+    },
+    search: {
+      enabled: true,
+      searchableColumns: ['title', 'brand', 'category']
+    },
+    filters: {
+      enabled: true,
+      filterableColumns: ['category', 'brand']
+    }
   }
 }
 

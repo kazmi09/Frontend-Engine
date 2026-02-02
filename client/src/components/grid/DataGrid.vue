@@ -27,7 +27,19 @@
               v-for="header in headerGroup.headers"
               :key="header.id"
               :style="{ width: `${header.getSize()}px` }"
-              class="border-b border-gray-200 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative"
+              :class="[
+                'border-b border-gray-200 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative',
+                {
+                  'cursor-move': header.id !== 'select' && header.id !== 'expander',
+                  'opacity-50': isDragging && draggedColumnId === header.id,
+                  'bg-blue-50': isDragging && draggedColumnId !== header.id
+                }
+              ]"
+              :draggable="header.id !== 'select' && header.id !== 'expander'"
+              @dragstart="header.id !== 'select' && header.id !== 'expander' ? handleDragStart(header.id, $event) : null"
+              @dragover="header.id !== 'select' && header.id !== 'expander' ? handleDragOver(header.id, $event) : null"
+              @drop="header.id !== 'select' && header.id !== 'expander' ? handleDrop(header.id, $event) : null"
+              @dragend="handleDragEnd"
             >
               <div class="flex items-center gap-2">
                 <!-- Selection Header -->
@@ -65,11 +77,19 @@
                 </template>
               </div>
               
+              <!-- Drop Indicator -->
+              <div
+                v-if="isDragging && dropIndicatorPosition !== null"
+                class="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-20 pointer-events-none"
+                :style="{ left: `${dropIndicatorPosition}px` }"
+              />
+              
               <!-- Resize Handle -->
               <div
                 v-if="header.column.getCanResize() && header.id !== 'select'"
                 class="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-blue-500"
                 @mousedown="startResize(header.column.id, $event)"
+                @dblclick="handleColumnDoubleClick(header.column.id)"
               />
             </th>
           </tr>
@@ -198,7 +218,11 @@ import {
   type ColumnDef,
 } from '@tanstack/vue-table'
 import { useGridStore } from '@/lib/grid/store'
+import { useGridStateStore } from '@/stores/gridState'
+import { gridStateStorage } from '@/lib/grid/GridStateStorage'
 import { useAuthStore } from '@/lib/auth/store'
+import { useColumnReordering } from '@/composables/useColumnReordering'
+import { useColumnResizing } from '@/composables/useColumnResizing'
 import { DataResult, ColumnConfig } from '@/lib/grid/types'
 import EditableCell from './cells/EditableCell.vue'
 import ExpanderCell from './cells/ExpanderCell.vue'
@@ -219,6 +243,7 @@ const emit = defineEmits<{
 
 const tableContainerRef = ref<HTMLDivElement>()
 const gridStore = useGridStore()
+const gridStateStore = useGridStateStore()
 const authStore = useAuthStore()
 
 // Use storeToRefs to make store properties reactive
@@ -280,6 +305,11 @@ const columns = computed<ColumnDef<any>[]>(() => {
       size: 50,
       minSize: 50,
       maxSize: 50,
+      meta: {
+        pinned: 'left',
+        reorderable: false,
+        resizable: false
+      }
     })
   } else {
     console.log('❌ NOT adding expander column')
@@ -296,6 +326,11 @@ const columns = computed<ColumnDef<any>[]>(() => {
     size: 50,
     minSize: 50,
     maxSize: 50,
+    meta: {
+      pinned: 'left',
+      reorderable: false,
+      resizable: false
+    }
   }
 
   const dataColumns: ColumnDef<any>[] = props.data.columns.map((col) => ({
@@ -308,7 +343,9 @@ const columns = computed<ColumnDef<any>[]>(() => {
     enableSorting: true,
     enableHiding: true, // Make sure this is true
     meta: {
-      columnConfig: col // Store the original column config
+      columnConfig: col, // Store the original column config
+      reorderable: true,
+      resizable: true
     }
   }))
 
@@ -332,12 +369,27 @@ const table = useVueTable({
     return columns.value 
   },
   state: {
-    get columnVisibility() { 
-      console.log('Getting columnVisibility:', columnVisibility.value)
+    get columnVisibility() {
+      console.log('[TABLE STATE] Getting columnVisibility:', columnVisibility.value)
       return columnVisibility.value 
     },
-    get columnOrder() { 
-      return columnOrder.value 
+    get columnOrder() {
+      // Always prepend special columns (expander, select) before data columns
+      const dataColumnOrder = columnOrder.value
+      const specialColumns = []
+      
+      // Add expander first if it exists
+      if (props.data?.expandable && hasExpandPermission.value) {
+        specialColumns.push('expander')
+      }
+      
+      // Add select column
+      specialColumns.push('select')
+      
+      // Combine: special columns first, then data columns
+      const fullOrder = [...specialColumns, ...dataColumnOrder]
+      console.log('Getting columnOrder - full order:', fullOrder)
+      return fullOrder
     },
     get columnPinning() { 
       return columnPinning.value 
@@ -364,10 +416,25 @@ const table = useVueTable({
     },
   },
   onColumnVisibilityChange: (updater) => {
-    console.log('onColumnVisibilityChange called with:', updater)
-    gridStore.setColumnVisibility(updater)
+    const newVisibility = typeof updater === 'function' ? updater(columnVisibility.value) : updater
+    console.log('[DataGrid] Column visibility changed:', newVisibility)
+    
+    // Update main grid store
+    gridStore.setColumnVisibility(newVisibility)
+    
+    // Update gridState store for persistence
+    Object.keys(newVisibility).forEach(columnId => {
+      console.log(`[DataGrid] Saving visibility for ${columnId}:`, newVisibility[columnId])
+      gridStateStore.updateColumnVisibility(gridId.value, columnId, newVisibility[columnId])
+    })
   },
-  onColumnOrderChange: gridStore.setColumnOrder,
+  onColumnOrderChange: (updater) => {
+    // Filter out special columns (select, expander) from the order
+    const newOrder = typeof updater === 'function' ? updater(columnOrder.value) : updater
+    const filteredOrder = newOrder.filter((id: string) => id !== 'select' && id !== 'expander')
+    console.log('onColumnOrderChange - filtered order:', filteredOrder)
+    gridStore.setColumnOrder(filteredOrder)
+  },
   onColumnPinningChange: gridStore.setColumnPinning,
   onColumnSizingChange: gridStore.setColumnSizing,
   onSortingChange: (updater) => {
@@ -434,7 +501,30 @@ const table = useVueTable({
   getSortedRowModel: getSortedRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
-  getRowId: (row) => row.id, // Tell TanStack Table how to identify rows
+  getRowId: (row, index) => {
+    // Use the primary key from the data result, fallback to 'id'
+    const primaryKey = props.data?.primaryKey || 'id'
+    
+    console.log('[DataGrid] getRowId called:')
+    console.log('  - primaryKey:', primaryKey)
+    console.log('  - index:', index)
+    console.log('  - row[primaryKey]:', row[primaryKey])
+    console.log('  - row.id:', row.id)
+    console.log('  - Full row keys:', Object.keys(row))
+    
+    // CRITICAL: Use ONLY the primary key field, NEVER use row.id as fallback
+    const rowId = row[primaryKey]?.toString()
+    
+    if (!rowId) {
+      console.error('[DataGrid] ERROR: Could not get row ID from primary key:', primaryKey)
+      console.error('[DataGrid] Row data:', row)
+      return String(Math.random())
+    }
+    
+    console.log('  - FINAL rowId:', rowId)
+    
+    return rowId
+  },
   manualPagination: true,
   manualSorting: false, // Let TanStack Table handle sorting
   enableRowSelection: true,
@@ -447,6 +537,79 @@ const table = useVueTable({
 const tableKey = computed(() => {
   return `${JSON.stringify(columnVisibility.value)}-${JSON.stringify(sorting.value)}`
 })
+
+// Initialize grid state and composables
+const gridId = computed(() => {
+  const id = props.data?.gridId || 'default'
+  console.log('[DataGrid] gridId computed - props.data?.gridId:', props.data?.gridId, 'returning:', id)
+  return id
+})
+
+// Column reordering composable - initialize after table is created
+let columnReorderingComposable: ReturnType<typeof useColumnReordering> | null = null
+let columnResizingComposable: ReturnType<typeof useColumnResizing> | null = null
+
+// Reactive refs for composable state
+const isDragging = ref(false)
+const draggedColumnId = ref<string | null>(null)
+const dropIndicatorPosition = ref<number | null>(null)
+const isResizing = ref(false)
+const resizingColumnId = ref<string | null>(null)
+
+// Initialize composables after mount
+const initializeComposables = () => {
+  if (!table || columnReorderingComposable) return
+  
+  columnReorderingComposable = useColumnReordering({
+    gridId: gridId.value,
+    tableInstance: table,
+    onOrderChange: (newOrder) => {
+      console.log('[DataGrid] Column order changed:', newOrder)
+    }
+  })
+  
+  columnResizingComposable = useColumnResizing({
+    gridId: gridId.value,
+    tableInstance: table,
+    minWidth: 50,
+    maxWidth: 1000,
+    onWidthChange: (columnId, width) => {
+      console.log('[DataGrid] Column width changed:', columnId, width)
+    }
+  })
+  
+  // Sync reactive refs
+  isDragging.value = columnReorderingComposable.isDragging.value
+  draggedColumnId.value = columnReorderingComposable.draggedColumnId.value
+  dropIndicatorPosition.value = columnReorderingComposable.dropIndicatorPosition.value
+  isResizing.value = columnResizingComposable.isResizing.value
+  resizingColumnId.value = columnResizingComposable.resizingColumnId.value
+}
+
+// Handlers that delegate to composables
+const handleDragStart = (columnId: string, event: DragEvent) => {
+  columnReorderingComposable?.handleDragStart(columnId, event)
+}
+
+const handleDragOver = (columnId: string, event: DragEvent) => {
+  columnReorderingComposable?.handleDragOver(columnId, event)
+}
+
+const handleDragEnd = (event: DragEvent) => {
+  columnReorderingComposable?.handleDragEnd(event)
+}
+
+const handleDrop = (targetColumnId: string, event: DragEvent) => {
+  columnReorderingComposable?.handleDrop(targetColumnId, event)
+}
+
+const composableResizeStart = (columnId: string, event: MouseEvent) => {
+  columnResizingComposable?.handleResizeStart(columnId, event)
+}
+
+const composableDoubleClick = (columnId: string) => {
+  columnResizingComposable?.handleDoubleClick(columnId)
+}
 
 // Table columns for Quasar - REMOVED, using native table now
 
@@ -466,6 +629,10 @@ const pageSizeOptions = [
   { label: '20', value: 20 },
   { label: '50', value: 50 },
   { label: '100', value: 100 },
+  { label: '500', value: 500 },
+  { label: '1000', value: 1000 },
+  { label: '5000', value: 5000 },
+  { label: 'All', value: 999999 },
 ]
 
 // Helper functions
@@ -571,31 +738,78 @@ const handleSort = (columnId: string, desc: boolean) => {
   }
 }
 
-// Column resizing
+// Column resizing - use composable
 const startResize = (columnId: string, event: MouseEvent) => {
-  event.preventDefault()
-  
-  const startX = event.clientX
-  const column = table.getColumn(columnId)
-  const startWidth = column?.getSize() || 150
-  
-  const handleMouseMove = (e: MouseEvent) => {
-    const diff = e.clientX - startX
-    const newWidth = Math.max(100, startWidth + diff)
-    gridStore.setColumnSizing({ ...columnSizing.value, [columnId]: newWidth })
-  }
-  
-  const handleMouseUp = () => {
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-  }
-  
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
+  composableResizeStart(columnId, event)
 }
 
-// Initialize default expanded rows
+// Double-click for auto-fit
+const handleColumnDoubleClick = (columnId: string) => {
+  composableDoubleClick(columnId)
+}
+
+// Initialize default expanded rows and grid state
 onMounted(() => {
+  console.log('[DataGrid] onMounted - Initializing grid state for:', gridId.value)
+  
+  // Initialize grid state with default config
+  // IMPORTANT: Only include data columns in the order, exclude special columns (select, expander)
+  const defaultColumnOrder = props.data?.columns?.map(col => col.id) || []
+  const defaultColumnWidths: Record<string, number> = {}
+  const defaultColumnVisibility: Record<string, boolean> = {}
+  
+  // Add data columns
+  props.data?.columns?.forEach(col => {
+    defaultColumnWidths[col.id] = col.width || 150
+    defaultColumnVisibility[col.id] = true
+  })
+  
+  // Add special columns with fixed widths (but don't include in order)
+  defaultColumnWidths['select'] = 50
+  defaultColumnWidths['expander'] = 50
+  defaultColumnVisibility['select'] = true
+  defaultColumnVisibility['expander'] = true
+  
+  // Initialize gridStateStore (this will load from localStorage if exists)
+  gridStateStore.initializeGrid(gridId.value, {
+    columnOrder: defaultColumnOrder, // Only data columns
+    columnWidths: defaultColumnWidths,
+    columnVisibility: defaultColumnVisibility
+  })
+  
+  // Get the loaded config (which may have been loaded from localStorage)
+  const loadedConfig = gridStateStore.getGridConfig(gridId.value).value
+  console.log('[DataGrid] Loaded config from gridStateStore:', loadedConfig)
+  
+  // Apply loaded column visibility to BOTH gridStore and TanStack Table
+  if (loadedConfig && loadedConfig.columnVisibility) {
+    console.log('[DataGrid] Applying loaded column visibility:', loadedConfig.columnVisibility)
+    
+    // CRITICAL: Update the main gridStore first (this is what the table state getter reads)
+    gridStore.setColumnVisibility(loadedConfig.columnVisibility)
+    
+    // Then update TanStack Table
+    table.setColumnVisibility(loadedConfig.columnVisibility)
+  }
+  
+  // Apply loaded column order to TanStack Table
+  const loadedOrder = gridStateStore.getColumnOrder(gridId.value).value
+  if (loadedOrder && loadedOrder.length > 0) {
+    console.log('[DataGrid] Applying loaded column order:', loadedOrder)
+    // Prepend special columns
+    const specialColumns = []
+    if (props.data?.expandable && hasExpandPermission.value) {
+      specialColumns.push('expander')
+    }
+    specialColumns.push('select')
+    const fullOrder = [...specialColumns, ...loadedOrder]
+    table.setColumnOrder(fullOrder)
+  }
+  
+  // Initialize composables after grid state is ready
+  initializeComposables()
+  
+  // Initialize expanded rows if configured
   if (props.data?.expandable?.defaultExpanded) {
     gridStore.expandAllRows(props.data.expandable.defaultExpanded)
   }
@@ -636,9 +850,10 @@ const handleExport = (selectedIds: string[]) => {
 
 // Helper function to get grid ID from data
 const getGridIdFromData = () => {
-  // Try to extract grid ID from the data structure
-  // This could be improved by passing it as a prop
-  return props.data?.gridId || 'default'
+  // Use the gridId from the data result, fallback to 'default'
+  const gridId = props.data?.gridId || 'default'
+  console.log('[DataGrid] Using gridId:', gridId, 'from props.data?.gridId:', props.data?.gridId)
+  return gridId
 }
 </script>
 
@@ -655,4 +870,19 @@ const getGridIdFromData = () => {
     
   tbody tr:hover
     background-color: rgba(0, 0, 0, 0.02)
+
+// Drag and drop styles
+th[draggable="true"]
+  user-select: none
+  
+  &:active
+    cursor: grabbing
+
+// Resize handle styles
+.cursor-col-resize
+  &:hover
+    background-color: rgba(59, 130, 246, 0.5)
+  
+  &:active
+    background-color: rgba(59, 130, 246, 0.8)
 </style>

@@ -100,11 +100,22 @@ export class GenericQueryBuilder {
 
     const rows = await queryMySQL<any>(dataQuery, queryParams)
 
+    const mappedRows = rows.map((row) => ({
+      ...row,
+      id: row[connection.primaryKey]?.toString() // Use primary key as ID
+    }))
+    
+    console.log('[GenericQueryBuilder] MySQL Query Result:')
+    console.log('  - Primary Key:', connection.primaryKey)
+    console.log('  - Total Rows:', totalRows)
+    console.log('  - Returned Rows:', mappedRows.length)
+    if (mappedRows.length > 0) {
+      console.log('  - First Row ID:', mappedRows[0].id)
+      console.log('  - First Row Sample:', JSON.stringify(mappedRows[0]).substring(0, 200))
+    }
+
     return {
-      rows: rows.map((row, index) => ({
-        ...row,
-        id: `${row[connection.primaryKey]}-${index}` // Create unique ID
-      })),
+      rows: mappedRows,
       totalRows,
       pageIndex,
       pageSize: limit
@@ -341,43 +352,59 @@ export class GenericQueryBuilder {
 
     try {
       let updatedCount = 0
+      const errors: string[] = []
 
       for (const id of selectedIds) {
         const primaryKeyValue = String(id).split('-')[0]
 
-        // Handle salary adjustment
-        if (updates._salaryAdjustment) {
-          const { type, value } = updates._salaryAdjustment
-          let salaryUpdateQuery = ""
+        try {
+          // Handle salary adjustment
+          if (updates._salaryAdjustment) {
+            const { type, value } = updates._salaryAdjustment
+            let salaryUpdateQuery = ""
 
-          if (type === 'percentage') {
-            salaryUpdateQuery = `UPDATE ${connection.table} SET salary = ROUND(salary * (1 + ? / 100), 2) WHERE ${connection.primaryKey} = ?`
-            await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
-          } else if (type === 'amount') {
-            salaryUpdateQuery = `UPDATE ${connection.table} SET salary = salary + ? WHERE ${connection.primaryKey} = ?`
-            await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
+            if (type === 'percentage') {
+              salaryUpdateQuery = `UPDATE ${connection.table} SET salary = ROUND(salary * (1 + ? / 100), 2) WHERE ${connection.primaryKey} = ?`
+              await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
+            } else if (type === 'amount') {
+              salaryUpdateQuery = `UPDATE ${connection.table} SET salary = salary + ? WHERE ${connection.primaryKey} = ?`
+              await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
+            }
+            updatedCount++
           }
-          updatedCount++
+
+          // Handle regular field updates
+          for (const [field, value] of Object.entries(updates)) {
+            if (field === '_salaryAdjustment') continue
+
+            // Validate field is editable
+            const column = this.config.columns.find(col => col.id === field)
+            if (!column || column.editable === false) continue
+
+            const updateQuery = `UPDATE ${connection.table} SET ${field} = ? WHERE ${connection.primaryKey} = ?`
+            await connection_db.execute(updateQuery, [value, primaryKeyValue])
+            updatedCount++
+          }
+        } catch (error: any) {
+          // Collect errors but continue with other rows
+          if (error.code === 'ER_DUP_ENTRY') {
+            errors.push(`Row ${primaryKeyValue}: Duplicate value - ${error.sqlMessage}`)
+          } else {
+            errors.push(`Row ${primaryKeyValue}: ${error.message}`)
+          }
         }
+      }
 
-        // Handle regular field updates
-        for (const [field, value] of Object.entries(updates)) {
-          if (field === '_salaryAdjustment') continue
-
-          // Validate field is editable
-          const column = this.config.columns.find(col => col.id === field)
-          if (!column || column.editable === false) continue
-
-          const updateQuery = `UPDATE ${connection.table} SET ${field} = ? WHERE ${connection.primaryKey} = ?`
-          await connection_db.execute(updateQuery, [value, primaryKeyValue])
-          updatedCount++
-        }
+      if (errors.length > 0 && updatedCount === 0) {
+        // All updates failed
+        throw new Error(`Bulk edit failed: ${errors.join('; ')}`)
       }
 
       return {
         success: true,
-        message: `Successfully updated ${selectedIds.length} records`,
-        updatedCount: selectedIds.length
+        message: `Successfully updated ${updatedCount} records${errors.length > 0 ? ` (${errors.length} failed)` : ''}`,
+        updatedCount,
+        errors: errors.length > 0 ? errors : undefined
       }
     } finally {
       connection_db.release()

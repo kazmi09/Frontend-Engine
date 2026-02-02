@@ -109,6 +109,10 @@ const props = defineProps<{
   columns?: ColumnConfig[]
 }>()
 
+const emit = defineEmits<{
+  columnVisibilityChanged: [visibility: Record<string, boolean>]
+}>()
+
 const gridStore = useGridStore()
 const $q = useQuasar()
 
@@ -149,15 +153,19 @@ const isColumnVisible = (columnId: string) => {
 }
 
 const toggleColumnVisibility = (columnId: string) => {
-  console.log('Toggle column visibility:', { columnId, currentVisibility: columnVisibility.value })
+  console.log('[GridToolbar] Toggle column visibility:', { columnId, currentVisibility: columnVisibility.value })
   
   const newVisibility = {
     ...columnVisibility.value,
     [columnId]: !isColumnVisible(columnId)
   }
   
-  console.log('New visibility state:', newVisibility)
+  console.log('[GridToolbar] New visibility state:', newVisibility)
   gridStore.setColumnVisibility(newVisibility)
+  
+  // IMPORTANT: Also persist to gridState store since this change comes from outside TanStack Table
+  // The onColumnVisibilityChange handler in DataGrid won't fire for external changes
+  emit('columnVisibilityChanged', newVisibility)
 }
 
 // Actions
