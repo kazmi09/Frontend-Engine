@@ -3,11 +3,13 @@
     ref="inputRef"
     v-model="localValue"
     dense
-    outlined
+    borderless
     :error="!!error"
     :error-message="error"
+    class="clean-input"
+    input-class="text-sm"
     @blur="$emit('save')"
-    @keydown.enter="$emit('save')"
+    @keydown.enter.prevent="$emit('save')"
     @keydown.escape="$emit('cancel')"
   />
 </template>
@@ -40,3 +42,19 @@ onMounted(() => {
   inputRef.value?.focus()
 })
 </script>
+
+<style lang="sass" scoped>
+.clean-input
+  :deep(.q-field__control)
+    padding: 0 8px
+    min-height: 36px
+    
+  :deep(.q-field__native)
+    padding: 0
+    
+  :deep(.q-field__control:before)
+    border: none
+    
+  :deep(.q-field__control:after)
+    border: none
+</style>

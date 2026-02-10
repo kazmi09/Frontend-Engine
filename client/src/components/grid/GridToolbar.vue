@@ -7,7 +7,7 @@
         v-model="searchText"
         outlined
         dense
-        placeholder="Search employees..."
+        placeholder="Search..."
         style="min-width: 300px"
         clearable
         @clear="clearSearch"

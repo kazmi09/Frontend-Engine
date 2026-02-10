@@ -50,8 +50,10 @@ export class GenericQueryBuilder {
       sortBy = []
     } = params
 
-    const limit = Math.min(pageSize, 1000)
+    const limit = Math.min(pageSize, 50000) // Allow up to 50k rows for "All" option
     const offset = pageIndex * limit
+    
+    console.log('[GenericQueryBuilder] Query params:', { pageIndex, pageSize, limit, offset, searchText, filterBy })
 
     // Build WHERE clause
     let whereClause = ''
@@ -106,11 +108,15 @@ export class GenericQueryBuilder {
     }))
     
     console.log('[GenericQueryBuilder] MySQL Query Result:')
+    console.log('  - Query:', dataQuery)
     console.log('  - Primary Key:', connection.primaryKey)
-    console.log('  - Total Rows:', totalRows)
+    console.log('  - Total Rows in DB:', totalRows)
+    console.log('  - Requested limit:', limit)
+    console.log('  - Requested offset:', offset)
     console.log('  - Returned Rows:', mappedRows.length)
     if (mappedRows.length > 0) {
       console.log('  - First Row ID:', mappedRows[0].id)
+      console.log('  - Last Row ID:', mappedRows[mappedRows.length - 1].id)
       console.log('  - First Row Sample:', JSON.stringify(mappedRows[0]).substring(0, 200))
     }
 

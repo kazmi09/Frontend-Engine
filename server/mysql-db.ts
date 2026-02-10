@@ -53,7 +53,7 @@ export function getMySQLPool(): mysql.Pool {
     
     // Test the connection
     pool.getConnection()
-      .then((conn) => {
+      .then(async (conn) => {
         console.log("[MySQL] Connection pool created successfully");
         conn.release();
       })

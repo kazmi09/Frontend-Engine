@@ -1,20 +1,90 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
+    <!-- Scroll Position Indicator - Always Visible for Testing -->
+    <div 
+      v-if="visibleRowRange.first && visibleRowRange.last"
+      class="fixed top-20 right-8 z-50 bg-primary text-white px-4 py-2 rounded-lg shadow-lg"
+    >
+      <div class="text-xs font-medium">
+        Viewing Rows: {{ visibleRowRange.first }} - {{ visibleRowRange.last }}
+      </div>
+      <div class="text-xs opacity-80 mt-1">
+        {{ visibleRowRange.count }} of {{ totalRows }} total
+      </div>
+    </div>
+
     <!-- Debug Info -->
     <div v-if="false" class="p-2 bg-gray-100 text-xs">
       <div>Data rows: {{ props.data?.rows?.length || 0 }}</div>
       <div>Columns: {{ props.data?.columns?.length || 0 }}</div>
       <div>Table rows: {{ table.getRowModel().rows.length }}</div>
+      <div>Virtual items: {{ rowVirtualizer && typeof rowVirtualizer.getVirtualItems === 'function' ? rowVirtualizer.getVirtualItems().length : 'N/A' }}</div>
+      <div>Total size: {{ rowVirtualizer && typeof rowVirtualizer.getTotalSize === 'function' ? rowVirtualizer.getTotalSize() : 'N/A' }}px</div>
       <div>First row data: {{ JSON.stringify(props.data?.rows?.[0]) }}</div>
     </div>
 
     <!-- Table Container -->
     <div 
       ref="tableContainerRef" 
-      class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white"
+      class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white relative"
+      style="overflow-y: auto; overflow-x: auto;"
     >
+      <!-- Enhanced Skeleton Loading with Quasar Components -->
+      <div v-if="isLoading && (!props.data || !props.data.rows || props.data.rows.length === 0)" class="w-full">
+        <table class="w-full border-collapse">
+          <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0">
+            <tr>
+              <!-- Checkbox column skeleton -->
+              <th class="border-b border-gray-200 dark:border-gray-700 px-4 py-3 w-12">
+                <q-skeleton type="QCheckbox" />
+              </th>
+              <!-- Dynamic column skeletons based on actual columns if available -->
+              <th 
+                v-for="i in (props.data?.columns?.length || 7)" 
+                :key="i" 
+                class="border-b border-gray-200 dark:border-gray-700 px-4 py-3"
+              >
+                <q-skeleton type="text" :width="`${60 + Math.random() * 40}%`" animation="wave" />
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white dark:bg-gray-900">
+            <tr 
+              v-for="i in 15" 
+              :key="i" 
+              class="border-b border-gray-200 dark:border-gray-700"
+            >
+              <!-- Checkbox cell skeleton -->
+              <td class="px-4 py-3">
+                <q-skeleton type="QCheckbox" animation="wave" />
+              </td>
+              <!-- Data cell skeletons with varying widths for realism -->
+              <td 
+                v-for="j in (props.data?.columns?.length || 7)" 
+                :key="j" 
+                class="px-4 py-3"
+              >
+                <q-skeleton 
+                  type="text" 
+                  :width="`${50 + Math.random() * 50}%`"
+                  animation="wave"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <!-- Loading indicator overlay -->
+        <div class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+          <div class="flex flex-col items-center gap-3">
+            <q-spinner-dots size="50px" color="primary" />
+            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">Loading data...</p>
+          </div>
+        </div>
+      </div>
+      
       <!-- Custom Table using TanStack Table -->
-      <div v-if="!props.data || !props.data.columns || props.data.columns.length === 0" class="p-8 text-center text-gray-500">
+      <div v-else-if="!props.data || !props.data.columns || props.data.columns.length === 0" class="p-8 text-center text-gray-500">
         <div v-if="isLoading">Loading...</div>
         <div v-else>No data available</div>
       </div>
@@ -86,75 +156,100 @@
               
               <!-- Resize Handle -->
               <div
-                v-if="header.column.getCanResize() && header.id !== 'select'"
-                class="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-blue-500"
+                v-if="header.column.getCanResize() && header.id !== 'select' && header.id !== 'expander'"
+                class="resize-handle absolute right-0 top-0 h-full w-2 cursor-col-resize group"
                 @mousedown="startResize(header.column.id, $event)"
                 @dblclick="handleColumnDoubleClick(header.column.id)"
-              />
+              >
+                <div class="h-full w-px bg-gray-300 group-hover:bg-blue-500 group-hover:w-0.5 transition-all ml-auto"></div>
+              </div>
             </th>
           </tr>
         </thead>
 
-        <!-- Body -->
+        <!-- Body with Virtual Scrolling -->
         <tbody class="bg-white divide-y divide-gray-200">
-          <template v-for="row in (table?.getRowModel?.()?.rows || [])" :key="row.id">
-            <!-- Main Row -->
-            <tr 
-              :class="getRowClass(row)"
-              class="hover:bg-gray-50"
-            >
-              <td
-                v-for="cell in (row?.getVisibleCells?.() || [])"
-                :key="cell.id"
-                :style="{ width: `${cell.column.getSize()}px` }"
-                class="border-b border-gray-200 px-4 py-3 whitespace-nowrap text-sm"
-              >
-                <!-- Expander Cell -->
-                <ExpanderCell
-                  v-if="cell.column.id === 'expander'"
-                  :row-id="row.original.id"
-                  :can-expand="canExpandRow(row)"
-                  @toggle="handleToggleExpansion"
-                />
+          <!-- Top spacer -->
+          <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
+            <td :colspan="columns.length" :style="{ height: `${rowVirtualizer.getVirtualItems()[0]?.start || 0}px`, padding: 0, border: 'none' }"></td>
+          </tr>
+          
+          <template v-for="virtualRow in rowVirtualizer.getVirtualItems()" :key="virtualRow.index">
+            <template v-if="table?.getRowModel?.()?.rows[virtualRow.index]">
+              <template v-for="row in [table.getRowModel().rows[virtualRow.index]]" :key="row.id">
+                <!-- Main Row -->
+                <tr 
+                  :class="getRowClass(row)"
+                  class="hover:bg-gray-50"
+                >
+                  <td
+                    v-for="cell in (row?.getVisibleCells?.() || [])"
+                    :key="cell.id"
+                    :style="{ width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px` }"
+                    class="border-b border-gray-200 px-4 py-3 text-sm overflow-hidden"
+                  >
+                    <!-- Expander Cell -->
+                    <ExpanderCell
+                      v-if="cell.column.id === 'expander'"
+                      :row-id="row.original.id"
+                      :can-expand="canExpandRow(row)"
+                      @toggle="handleToggleExpansion"
+                    />
+                    
+                    <!-- Selection Cell -->
+                    <template v-else-if="cell.column.id === 'select'">
+                      <q-checkbox
+                        :model-value="row?.getIsSelected?.()"
+                        @update:model-value="(value) => row?.toggleSelected?.(value)"
+                      />
+                    </template>
+                    
+                    <!-- Regular Cell -->
+                    <EditableCell
+                      v-else
+                      :value="cell.getValue()"
+                      :row-id="row.original.id"
+                      :column="getColumnConfig(cell.column.id)"
+                      :width="cell.column.getSize()"
+                      :grid-id="gridId"
+                    />
+                  </td>
+                </tr>
                 
-                <!-- Selection Cell -->
-                <template v-else-if="cell.column.id === 'select'">
-                  <q-checkbox
-                    :model-value="row?.getIsSelected?.()"
-                    @update:model-value="(value) => row?.toggleSelected?.(value)"
-                  />
-                </template>
-                
-                <!-- Regular Cell -->
-                <EditableCell
-                  v-else
-                  :value="cell.getValue()"
-                  :row-id="row.original.id"
-                  :column="getColumnConfig(cell.column.id)"
-                  :width="cell.column.getSize()"
-                />
-              </td>
-            </tr>
-            
-            <!-- Detail Panel Row -->
-            <template v-if="row.getIsExpanded?.()">
-              <DetailPanel
-                :row="row.original"
-                :row-id="row.original.id"
-                :column-count="row.getVisibleCells().length"
-                :expandable-config="props.data.expandable!"
-                :columns="props.data.columns"
-                :grid-id="getGridIdFromData()"
-                @retry="handleRetryDetailLoad"
-              >
-                <template #default="slotProps">
-                  <slot name="detail-panel" v-bind="slotProps" />
-                </template>
-              </DetailPanel>
+                <!-- Detail Panel Row -->
+                <tr v-if="row.getIsExpanded?.()" :key="`${row.id}-detail`">
+                  <td :colspan="row.getVisibleCells().length" class="p-0">
+                    <DetailPanel
+                      :row="row.original"
+                      :row-id="row.original.id"
+                      :column-count="row.getVisibleCells().length"
+                      :expandable-config="props.data.expandable!"
+                      :columns="props.data.columns"
+                      :grid-id="getGridIdFromData()"
+                      @retry="handleRetryDetailLoad"
+                    >
+                      <template #default="slotProps">
+                        <slot name="detail-panel" v-bind="slotProps" />
+                      </template>
+                    </DetailPanel>
+                  </td>
+                </tr>
+              </template>
             </template>
           </template>
+          
+          <!-- Bottom spacer -->
+          <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
+            <td :colspan="columns.length" :style="{ height: `${rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0)}px`, padding: 0, border: 'none' }"></td>
+          </tr>
         </tbody>
       </table>
+
+      <!-- Loading More Indicator (Infinite Scroll) -->
+      <div v-if="isFetchingNext" class="flex items-center justify-center py-4 bg-gray-50">
+        <q-spinner-dots size="30px" color="primary" />
+        <span class="ml-2 text-sm text-gray-600">Loading more data...</span>
+      </div>
 
       <!-- Loading Overlay -->
       <div v-if="isLoading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
@@ -186,12 +281,12 @@
       </div>
 
       <q-pagination
-        v-model="currentPage"
+        v-model="currentVirtualPage"
         :max="totalPages"
         :max-pages="7"
         direction-links
         boundary-links
-        @update:model-value="(value) => gridStore.setPageIndex(value - 1)"
+        @update:model-value="handlePageChange"
       />
     </div>
 
@@ -209,11 +304,11 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
   getExpandedRowModel,
   type ColumnDef,
 } from '@tanstack/vue-table'
@@ -232,9 +327,12 @@ import BulkActionsBar from './BulkActionsBar.vue'
 const props = defineProps<{
   data: DataResult
   isLoading?: boolean
+  hasNextPage?: boolean
+  isFetchingNext?: boolean
 }>()
 
 const emit = defineEmits<{
+  loadMore: []
   bulkEdit: [data: { selectedIds: string[], updates: Record<string, any> }]
   bulkArchive: [selectedIds: string[]]
   bulkDelete: [selectedIds: string[]]
@@ -245,6 +343,15 @@ const tableContainerRef = ref<HTMLDivElement>()
 const gridStore = useGridStore()
 const gridStateStore = useGridStateStore()
 const authStore = useAuthStore()
+
+// Scroll indicator state
+const showScrollIndicator = ref(false)
+const scrollTimeout = ref<number | null>(null)
+const visibleRowRange = ref({
+  first: '',
+  last: '',
+  count: 0
+})
 
 // Use storeToRefs to make store properties reactive
 const { 
@@ -263,31 +370,17 @@ const { user } = storeToRefs(authStore)
 
 // Check if user has permission to expand rows
 const hasExpandPermission = computed(() => {
-  console.log('=== EXPAND PERMISSION CHECK ===')
-  console.log('expandable config:', props.data?.expandable)
-  console.log('required permissions:', props.data?.expandable?.requiredPermissions)
-  console.log('user role:', user.value.role)
-  
   if (!props.data?.expandable?.requiredPermissions) {
-    console.log('No permissions required, returning true')
     return true
   }
   const userRole = user.value.role
   const hasPermission = props.data.expandable.requiredPermissions.includes(userRole)
-  console.log('Has permission?', hasPermission)
-  console.log('=== END PERMISSION CHECK ===')
   return hasPermission
 })
 
 // Columns definition
 const columns = computed<ColumnDef<any>[]>(() => {
-  console.log('=== COMPUTING COLUMNS ===')
-  console.log('Computing columns, data:', props.data)
-  console.log('Has expandable?', !!props.data?.expandable)
-  console.log('Has permission?', hasExpandPermission.value)
-  
   if (!props.data?.columns || !Array.isArray(props.data.columns)) {
-    console.log('No columns data available, returning empty array')
     return []
   }
   
@@ -295,7 +388,6 @@ const columns = computed<ColumnDef<any>[]>(() => {
   
   // Add expander column if expandable config exists and user has permissions
   if (props.data.expandable && hasExpandPermission.value) {
-    console.log('✅ Adding expander column!')
     cols.push({
       id: "expander",
       header: "",
@@ -311,10 +403,6 @@ const columns = computed<ColumnDef<any>[]>(() => {
         resizable: false
       }
     })
-  } else {
-    console.log('❌ NOT adding expander column')
-    console.log('  - has expandable?', !!props.data.expandable)
-    console.log('  - has permission?', hasExpandPermission.value)
   }
   
   const selectColumn: ColumnDef<any> = {
@@ -350,7 +438,6 @@ const columns = computed<ColumnDef<any>[]>(() => {
   }))
 
   cols.push(selectColumn, ...dataColumns)
-  console.log('Computed columns:', cols)
   return cols
 })
 
@@ -358,11 +445,6 @@ const columns = computed<ColumnDef<any>[]>(() => {
 const table = useVueTable({
   data: computed(() => {
     const rows = props.data?.rows || []
-    console.log('Table data:', rows.length, 'rows')
-    if (rows.length > 0) {
-      console.log('First row sample:', rows[0])
-      console.log('First row ID:', rows[0].id)
-    }
     return rows
   }),
   get columns() { 
@@ -370,7 +452,6 @@ const table = useVueTable({
   },
   state: {
     get columnVisibility() {
-      console.log('[TABLE STATE] Getting columnVisibility:', columnVisibility.value)
       return columnVisibility.value 
     },
     get columnOrder() {
@@ -388,7 +469,6 @@ const table = useVueTable({
       
       // Combine: special columns first, then data columns
       const fullOrder = [...specialColumns, ...dataColumnOrder]
-      console.log('Getting columnOrder - full order:', fullOrder)
       return fullOrder
     },
     get columnPinning() { 
@@ -398,14 +478,12 @@ const table = useVueTable({
       return columnSizing.value 
     },
     get sorting() { 
-      console.log('Getting sorting state:', sorting.value)
       return sorting.value 
     },
     get rowSelection() { 
       return rowSelection.value 
     },
     get expanded() {
-      console.log('[TABLE STATE] Getting expanded state:', expandedRows.value)
       return expandedRows.value
     },
     get pagination() {
@@ -499,18 +577,10 @@ const table = useVueTable({
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
-  getPaginationRowModel: getPaginationRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
   getRowId: (row, index) => {
     // Use the primary key from the data result, fallback to 'id'
     const primaryKey = props.data?.primaryKey || 'id'
-    
-    console.log('[DataGrid] getRowId called:')
-    console.log('  - primaryKey:', primaryKey)
-    console.log('  - index:', index)
-    console.log('  - row[primaryKey]:', row[primaryKey])
-    console.log('  - row.id:', row.id)
-    console.log('  - Full row keys:', Object.keys(row))
     
     // CRITICAL: Use ONLY the primary key field, NEVER use row.id as fallback
     const rowId = row[primaryKey]?.toString()
@@ -521,8 +591,6 @@ const table = useVueTable({
       return String(Math.random())
     }
     
-    console.log('  - FINAL rowId:', rowId)
-    
     return rowId
   },
   manualPagination: true,
@@ -532,6 +600,145 @@ const table = useVueTable({
   enableColumnResizing: true,
   columnResizeMode: "onChange",
 })
+
+// Virtual scrolling setup
+const rowVirtualizer = useVirtualizer({
+  get count() {
+    return table.getRowModel().rows.length
+  },
+  getScrollElement: () => tableContainerRef.value || null,
+  estimateSize: () => 53, // Estimated row height in pixels
+  overscan: 10, // Increased overscan to prevent shaking during fast scroll
+  measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
+    ? (element) => element?.getBoundingClientRect().height
+    : undefined,
+  scrollMargin: 0,
+  // Enable smooth scrolling
+  enabled: true,
+})
+
+// Update visible row range
+const updateVisibleRowRange = () => {
+  // Check if rowVirtualizer is initialized
+  if (!rowVirtualizer || typeof rowVirtualizer.getVirtualItems !== 'function') {
+    return
+  }
+  
+  const virtualItems = rowVirtualizer.getVirtualItems()
+  
+  if (virtualItems.length > 0) {
+    const firstIndex = virtualItems[0].index
+    const lastIndex = virtualItems[virtualItems.length - 1].index
+    const rows = table.getRowModel().rows
+    
+    if (rows[firstIndex] && rows[lastIndex]) {
+      const primaryKey = props.data?.primaryKey || 'id'
+      const newRange = {
+        first: String(rows[firstIndex].original[primaryKey] || rows[firstIndex].original.id || ''),
+        last: String(rows[lastIndex].original[primaryKey] || rows[lastIndex].original.id || ''),
+        count: lastIndex - firstIndex + 1
+      }
+      
+      // Only update if changed to trigger reactivity
+      if (newRange.first !== visibleRowRange.value.first || newRange.last !== visibleRowRange.value.last) {
+        visibleRowRange.value = newRange
+      }
+    }
+  }
+}
+
+// Show scroll indicator on scroll
+onMounted(() => {
+  const container = tableContainerRef.value
+  if (container) {
+    // Update immediately on mount
+    setTimeout(() => {
+      updateVisibleRowRange()
+    }, 100)
+    
+    // Add interval-based updates for infinite scroll mode
+    const updateInterval = setInterval(() => {
+      if (props.hasNextPage || props.isFetchingNext) {
+        updateVisibleRowRange()
+      }
+    }, 500) // Update every 500ms in infinite scroll mode
+    
+    // Throttle scroll updates for smooth performance
+    let scrollRAF: number | null = null
+    let lastScrollCheck = 0
+    
+    // Update on scroll and check if we need to load more
+    const handleScroll = () => {
+      // Use requestAnimationFrame for smooth updates
+      if (scrollRAF) {
+        cancelAnimationFrame(scrollRAF)
+      }
+      
+      scrollRAF = requestAnimationFrame(() => {
+        updateVisibleRowRange()
+        showScrollIndicator.value = true
+        
+        // Throttle load more check to every 100ms
+        const now = Date.now()
+        if (now - lastScrollCheck > 100) {
+          lastScrollCheck = now
+          
+          // Check if we should load more data (infinite scroll)
+          if (props.hasNextPage && !props.isFetchingNext) {
+            const scrollTop = container.scrollTop
+            const scrollHeight = container.scrollHeight
+            const clientHeight = container.clientHeight
+            const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
+            
+            // Load more when 80% scrolled
+            if (scrollPercentage >= 0.8) {
+              console.log('[DataGrid] Loading more data...')
+              emit('loadMore')
+            }
+          }
+        }
+        
+        // Hide indicator after 2 seconds of no scrolling
+        if (scrollTimeout.value) {
+          clearTimeout(scrollTimeout.value)
+        }
+        scrollTimeout.value = window.setTimeout(() => {
+          showScrollIndicator.value = false
+        }, 2000)
+        
+        scrollRAF = null
+      })
+    }
+    
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    
+    // Cleanup on unmount
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      clearInterval(updateInterval)
+      if (scrollRAF) {
+        cancelAnimationFrame(scrollRAF)
+      }
+    }
+  }
+})
+
+// Also update visible range when virtual items change
+watch(() => {
+  if (rowVirtualizer && typeof rowVirtualizer.getVirtualItems === 'function') {
+    return rowVirtualizer.getVirtualItems()
+  }
+  return []
+}, () => {
+  updateVisibleRowRange()
+}, { deep: true })
+
+// Update visible row range when data changes
+watch(() => props.data?.rows, () => {
+  setTimeout(() => {
+    updateVisibleRowRange()
+  }, 100)
+}, { immediate: true })
 
 // Force table re-render when state changes
 const tableKey = computed(() => {
@@ -621,19 +828,116 @@ const currentPage = computed({
 
 const totalRows = computed(() => props.data?.pagination?.totalRows || 0)
 const totalPages = computed(() => Math.ceil(totalRows.value / pageSize.value))
-const startRow = computed(() => pageIndex.value * pageSize.value + 1)
-const endRow = computed(() => Math.min((pageIndex.value + 1) * pageSize.value, totalRows.value))
 
-const pageSizeOptions = [
-  { label: '10', value: 10 },
-  { label: '20', value: 20 },
-  { label: '50', value: 50 },
-  { label: '100', value: 100 },
-  { label: '500', value: 500 },
-  { label: '1000', value: 1000 },
-  { label: '5000', value: 5000 },
-  { label: 'All', value: 999999 },
-]
+// For infinite scroll mode: show actual loaded rows
+const loadedRows = computed(() => props.data?.rows?.length || 0)
+
+// For infinite scroll mode: calculate virtual page based on visible rows
+const currentVirtualPage = computed({
+  get: () => {
+    if (props.hasNextPage || props.isFetchingNext) {
+      // Calculate based on first visible row
+      const firstVisibleId = visibleRowRange.value.first
+      if (!firstVisibleId || !props.data?.rows) {
+        return 1
+      }
+      
+      const firstVisibleIndex = props.data.rows.findIndex(row => {
+        const primaryKey = props.data?.primaryKey || 'id'
+        return String(row[primaryKey]) === firstVisibleId
+      })
+      
+      if (firstVisibleIndex >= 0) {
+        const currentPageSize = pageSize.value
+        const calculatedPage = Math.max(1, Math.ceil((firstVisibleIndex + 1) / currentPageSize))
+        return calculatedPage
+      }
+      return 1
+    } else {
+      return currentPage.value
+    }
+  },
+  set: (value) => {
+    // Only allow setting in regular mode
+    if (!props.hasNextPage && !props.isFetchingNext) {
+      gridStore.setPageIndex(value - 1)
+    }
+  }
+})
+
+// Calculate start/end rows based on mode
+const startRow = computed(() => {
+  if (props.hasNextPage || props.isFetchingNext) {
+    // Infinite scroll mode: calculate based on first visible row
+    const firstVisibleId = visibleRowRange.value.first
+    if (!firstVisibleId) return 1
+    
+    // Find the index of the first visible row in the loaded data
+    const firstVisibleIndex = props.data?.rows?.findIndex(row => {
+      const primaryKey = props.data?.primaryKey || 'id'
+      return String(row[primaryKey]) === firstVisibleId
+    })
+    
+    return firstVisibleIndex !== undefined && firstVisibleIndex >= 0 ? firstVisibleIndex + 1 : 1
+  } else {
+    // Regular pagination mode
+    return pageIndex.value * pageSize.value + 1
+  }
+})
+
+const endRow = computed(() => {
+  if (props.hasNextPage || props.isFetchingNext) {
+    // Infinite scroll mode: calculate based on last visible row
+    const lastVisibleId = visibleRowRange.value.last
+    if (!lastVisibleId) return loadedRows.value
+    
+    // Find the index of the last visible row in the loaded data
+    const lastVisibleIndex = props.data?.rows?.findIndex(row => {
+      const primaryKey = props.data?.primaryKey || 'id'
+      return String(row[primaryKey]) === lastVisibleId
+    })
+    
+    return lastVisibleIndex !== undefined && lastVisibleIndex >= 0 ? lastVisibleIndex + 1 : loadedRows.value
+  } else {
+    // Regular pagination mode
+    return Math.min((pageIndex.value + 1) * pageSize.value, totalRows.value)
+  }
+})
+
+// Handle page change - works in both regular and infinite scroll modes
+const handlePageChange = (value: number) => {
+  if (props.hasNextPage || props.isFetchingNext) {
+    // Infinite scroll mode: scroll to the target page position
+    const targetRowIndex = (value - 1) * pageSize.value
+    const container = tableContainerRef.value
+    
+    if (container && rowVirtualizer) {
+      // Calculate the scroll position for the target row
+      const scrollToPosition = targetRowIndex * 53 // 53px per row
+      container.scrollTop = scrollToPosition
+    }
+  } else {
+    // Regular pagination mode: change page index
+    gridStore.setPageIndex(value - 1)
+  }
+}
+
+const pageSizeOptions = computed(() => {
+  const totalRows = props.data?.pagination?.totalRows || 0
+  
+  const options = [
+    { label: '10', value: 10 },
+    { label: '20', value: 20 },
+    { label: '50', value: 50 },
+    { label: '100', value: 100 },
+    { label: '500', value: 500 },
+    { label: '1000', value: 1000 },
+    { label: '5000', value: 5000 },
+    { label: `All (${totalRows.toLocaleString()})`, value: totalRows }
+  ]
+  
+  return options
+})
 
 // Helper functions
 const getColumnConfig = (columnId: string): ColumnConfig => {
@@ -806,6 +1110,17 @@ onMounted(() => {
     table.setColumnOrder(fullOrder)
   }
   
+  // Apply loaded column widths to gridStore and TanStack Table
+  if (loadedConfig && loadedConfig.columnWidths) {
+    console.log('[DataGrid] Applying loaded column widths:', loadedConfig.columnWidths)
+    
+    // Update the main gridStore columnSizing
+    gridStore.setColumnSizing(loadedConfig.columnWidths)
+    
+    // Also update TanStack Table directly
+    table.setColumnSizing(loadedConfig.columnWidths)
+  }
+  
   // Initialize composables after grid state is ready
   initializeComposables()
   
@@ -879,10 +1194,63 @@ th[draggable="true"]
     cursor: grabbing
 
 // Resize handle styles
-.cursor-col-resize
+.resize-handle
+  z-index: 10
+  user-select: none
+  
   &:hover
-    background-color: rgba(59, 130, 246, 0.5)
+    .w-px
+      background-color: #1976d2
+      width: 2px
   
   &:active
-    background-color: rgba(59, 130, 246, 0.8)
+    .w-px
+      background-color: #1565c0
+      width: 3px
+
+// Table container optimizations
+.flex-1
+  // Use CSS containment for better performance
+  contain: layout style paint
+
+// Table performance optimizations
+table
+  // Prevent layout shifts during scroll
+  table-layout: fixed
+  
+  tbody tr
+    // Fixed row height prevents shaking
+    height: 53px
+    // Prevent content from causing layout shifts
+    contain: layout style paint
+    // Hardware acceleration
+    will-change: transform
+  
+  tbody td
+    // Prevent cell expansion
+    overflow: hidden
+    text-overflow: ellipsis
+    white-space: nowrap
+    // Fixed height to prevent jumping
+    height: 53px
+    max-height: 53px
+    box-sizing: border-box
+
+// Smooth scrolling container
+.overflow-auto
+  // Enable smooth scrolling
+  scroll-behavior: smooth
+  // Prevent overscroll bounce
+  overscroll-behavior: contain
+  // Hardware acceleration
+  transform: translateZ(0)
+  -webkit-overflow-scrolling: touch
+
+// Scroll indicator fade transition
+.fade-enter-active, .fade-leave-active
+  transition: opacity 0.3s ease
+
+.fade-enter-from, .fade-leave-to
+  opacity: 0
+
 </style>

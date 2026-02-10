@@ -22,27 +22,60 @@ export function useGridUpdate(gridId: string = 'employees') {
       updatingCells.value.add(cellKey);
 
       // Cancel any outgoing refetches for this grid's queries
-      const queryKey = `${gridId}_generic`;
-      await queryClient.cancelQueries({ queryKey: [queryKey] });
+      // Support multiple query key patterns: generic, regular, and infinite
+      const queryKeys = [
+        `${gridId}_generic`,
+        `${gridId}_regular`,
+        `${gridId}_infinite`
+      ];
+      
+      for (const key of queryKeys) {
+        await queryClient.cancelQueries({ queryKey: [key] });
+      }
 
       // Get all matching query data and update them optimistically
       const queryCache = queryClient.getQueryCache();
-      const queries = queryCache.findAll({ queryKey: [queryKey] });
-      
       const previousDataMap = new Map();
       
-      queries.forEach((query) => {
-        const previousData = query.state.data as DataResult | undefined;
-        if (previousData) {
-          previousDataMap.set(query.queryKey, previousData);
-          // Optimistically update to the new value
-          queryClient.setQueryData<DataResult>(query.queryKey, {
-            ...previousData,
-            rows: previousData.rows.map((row) =>
-              row.id === rowId ? { ...row, [columnId]: value } : row
-            ),
-          });
-        }
+      // Find all queries that match any of our patterns
+      queryKeys.forEach(key => {
+        const queries = queryCache.findAll({ 
+          predicate: (query) => {
+            const qKey = query.queryKey as string[];
+            return qKey[0] === key;
+          }
+        });
+        
+        queries.forEach((query) => {
+          const previousData = query.state.data;
+          if (previousData) {
+            previousDataMap.set(query.queryKey, previousData);
+            
+            // Handle regular DataResult
+            if ((previousData as any).rows) {
+              const dataResult = previousData as DataResult;
+              queryClient.setQueryData<DataResult>(query.queryKey, {
+                ...dataResult,
+                rows: dataResult.rows.map((row) =>
+                  row.id === rowId ? { ...row, [columnId]: value } : row
+                ),
+              });
+            }
+            // Handle infinite query pages
+            else if ((previousData as any).pages) {
+              const infiniteData = previousData as any;
+              queryClient.setQueryData(query.queryKey, {
+                ...infiniteData,
+                pages: infiniteData.pages.map((page: DataResult) => ({
+                  ...page,
+                  rows: page.rows.map((row: any) =>
+                    row.id === rowId ? { ...row, [columnId]: value } : row
+                  ),
+                })),
+              });
+            }
+          }
+        });
       });
 
       return { previousDataMap, cellKey };

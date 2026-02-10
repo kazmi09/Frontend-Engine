@@ -1,24 +1,36 @@
 <template>
   <div 
-    class="relative w-full h-full min-h-[40px] flex items-center"
+    class="relative w-full h-full flex items-center cell-container"
+    :style="{ minHeight: '40px', height: '40px' }"
     :class="cellClass"
     @click="startEdit"
   >
     <!-- Display Mode -->
     <div 
       v-if="!isEditing" 
-      class="w-full px-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded"
+      class="w-full px-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded overflow-hidden transition-colors"
       :class="{ 'opacity-50': !isEditable }"
     >
-      <component 
-        :is="displayComponent" 
-        :value="displayValue" 
-        :column="column"
-      />
+      <div class="truncate">
+        <component 
+          :is="displayComponent" 
+          :value="displayValue" 
+          :column="column"
+        />
+        <q-tooltip 
+          v-if="displayValue"
+          anchor="top middle" 
+          self="bottom middle"
+          :offset="[0, 8]"
+          max-width="400px"
+        >
+          {{ displayValue }}
+        </q-tooltip>
+      </div>
     </div>
 
     <!-- Edit Mode -->
-    <div v-else class="w-full px-2 py-1">
+    <div v-else class="w-full h-full flex items-center edit-mode-container">
       <component
         :is="editComponent"
         v-model="editValue"
@@ -32,19 +44,19 @@
     </div>
 
     <!-- Loading Indicator -->
-    <q-spinner
-      v-if="isCellLoading"
-      size="16px"
-      class="absolute top-1 right-1"
-      color="primary"
-    />
+    <div v-if="isCellLoading" class="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80">
+      <q-spinner
+        size="20px"
+        color="primary"
+      />
+    </div>
 
     <!-- Error Indicator -->
     <q-icon
       v-else-if="error"
       name="error"
-      size="16px"
-      class="absolute top-1 right-1 text-negative"
+      size="18px"
+      class="absolute top-2 right-2 text-negative"
     >
       <q-tooltip>{{ error }}</q-tooltip>
     </q-icon>
@@ -76,13 +88,14 @@ const props = defineProps<{
   rowId: string
   column: ColumnConfig
   width: number
+  gridId: string
 }>()
 
 const editValue = ref(props.value)
 const isEditing = ref(false)
 const error = ref<string | null>(null)
 
-const updateMutation = useGridUpdate()
+const updateMutation = useGridUpdate(props.gridId)
 const authStore = useAuthStore()
 
 // Check if this specific cell is updating
@@ -189,14 +202,24 @@ const onCancel = () => {
 </script>
 
 <style lang="sass" scoped>
+.cell-container
+  transition: all 0.2s ease
+
 .editing
-  background-color: rgba(25, 118, 210, 0.1)
-  border: 1px solid #1976d2
+  background-color: rgba(25, 118, 210, 0.05)
+  border: 2px solid #1976d2
+  border-radius: 4px
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1)
+
+.edit-mode-container
+  padding: 0
+  margin: 0
 
 .readonly
   cursor: not-allowed
 
 .error
-  background-color: rgba(244, 67, 54, 0.1)
-  border: 1px solid #f44336
+  background-color: rgba(244, 67, 54, 0.05)
+  border: 2px solid #f44336
+  border-radius: 4px
 </style>

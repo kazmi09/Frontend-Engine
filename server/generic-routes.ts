@@ -55,7 +55,7 @@ export function registerGenericGridRoutes(app: Express) {
       const { gridId } = req.params
       
       // Parse query parameters
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 1000)
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50000)
       const offset = parseInt(req.query.offset as string) || 0
       const pageIndex = Math.floor(offset / limit)
       const searchText = (req.query.search as string) || ""

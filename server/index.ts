@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -13,15 +14,29 @@ declare module "http" {
   }
 }
 
+// Enable gzip compression for all responses
+app.use(compression({
+  level: 6, // Compression level (0-9, 6 is default)
+  threshold: 1024, // Only compress responses larger than 1KB
+  filter: (req, res) => {
+    // Compress all responses except those that explicitly opt out
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(
   express.json({
+    limit: '50mb', // Increase limit for large data responses
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -88,6 +103,10 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || "5000", 10);
   // Use localhost on Windows to avoid ENOTSUP error, 0.0.0.0 on Unix systems
   const host = process.platform === "win32" ? "localhost" : "0.0.0.0";
+  
+  // Set timeout for large data responses (5 minutes)
+  httpServer.timeout = 300000;
+  
   httpServer.listen(
     {
       port,

@@ -54,7 +54,10 @@
         v-else-if="data" 
         :data="data" 
         :is-loading="isLoading"
+        :has-next-page="useInfiniteScrollMode ? (hasNextPage || false) : false"
+        :is-fetching-next="useInfiniteScrollMode ? (isInfiniteFetching || false) : false"
         class="flex-1"
+        @load-more="() => useInfiniteScrollMode && fetchNextPage()"
         @bulk-edit="handleBulkEdit"
         @bulk-archive="handleBulkArchive"
         @bulk-delete="handleBulkDelete"
@@ -65,10 +68,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/vue-query'
 import { useQuasar } from 'quasar'
 import { createGridApi } from '@/lib/api/generic-grid'
 import { useGridStore } from '@/lib/grid/store'
@@ -111,20 +114,92 @@ const gridApi = computed(() => createGridApi({
 // Use storeToRefs to make store properties reactive
 const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
 
-// React Query: fetch data for current grid
-const { data, isLoading, isRefetching, refetch, error } = useQuery<DataResult, Error>({
+// Determine if we should use infinite scroll (for large page sizes)
+const useInfiniteScrollMode = computed(() => pageSize.value >= 1000)
+const CHUNK_SIZE = 100 // Load 100 rows at a time
+
+// Regular query for normal page sizes
+const { 
+  data: regularData, 
+  isLoading: isRegularLoading, 
+  isRefetching: isRegularRefetching, 
+  refetch: refetchRegular, 
+  error: regularError 
+} = useQuery<DataResult, Error>({
   queryKey: computed(() => {
-    return [`${gridId.value}_generic`, pageIndex.value, pageSize.value, searchText.value, filterBy.value]
+    return [`${gridId.value}_regular`, pageIndex.value, pageSize.value, searchText.value, filterBy.value]
   }),
   queryFn: () => {
     return gridApi.value.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
   },
+  enabled: computed(() => !useInfiniteScrollMode.value),
   staleTime: 60_000,
 })
 
+// Infinite query for large page sizes
+const {
+  data: infiniteData,
+  isLoading: isInfiniteLoading,
+  isFetching: isInfiniteFetching,
+  fetchNextPage,
+  hasNextPage,
+  refetch: refetchInfinite,
+  error: infiniteError
+} = useInfiniteQuery({
+  queryKey: computed(() => {
+    return [`${gridId.value}_infinite`, searchText.value, filterBy.value]
+  }),
+  queryFn: async ({ pageParam = 0 }) => {
+    return gridApi.value.getAll(pageParam, CHUNK_SIZE, searchText.value, filterBy.value)
+  },
+  getNextPageParam: (lastPage, allPages) => {
+    const loadedRows = allPages.reduce((sum, page) => sum + page.rows.length, 0)
+    const totalRows = lastPage.pagination?.totalRows || 0
+    return loadedRows < totalRows ? allPages.length : undefined
+  },
+  enabled: computed(() => useInfiniteScrollMode.value),
+  staleTime: 60_000,
+})
+
+// Combine data from infinite query pages
+const combinedInfiniteData = computed<DataResult | undefined>(() => {
+  if (!infiniteData.value?.pages) return undefined
+  
+  const pages = infiniteData.value.pages
+  const firstPage = pages[0]
+  
+  return {
+    ...firstPage,
+    rows: pages.flatMap(page => page.rows),
+    pagination: {
+      ...firstPage.pagination,
+      pageSize: pages.reduce((sum, page) => sum + page.rows.length, 0),
+      pageIndex: 0
+    }
+  }
+})
+
+// Unified data, loading, and error states
+const data = computed(() => useInfiniteScrollMode.value ? combinedInfiniteData.value : regularData.value)
+const isLoading = computed(() => useInfiniteScrollMode.value ? isInfiniteLoading.value : isRegularLoading.value)
+const isRefetching = computed(() => useInfiniteScrollMode.value ? isInfiniteFetching.value : isRegularRefetching.value)
+const error = computed(() => useInfiniteScrollMode.value ? infiniteError.value : regularError.value)
+
+const refetch = () => {
+  if (useInfiniteScrollMode.value) {
+    refetchInfinite()
+  } else {
+    refetchRegular()
+  }
+}
+
 // Invalidate cache when pagination, search, or filter changes
 watch([pageIndex, pageSize, searchText, filterBy], () => {
-  queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
+  if (useInfiniteScrollMode.value) {
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_infinite`] })
+  } else {
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_regular`] })
+  }
 })
 
 // Column visibility handler
