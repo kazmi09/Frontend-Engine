@@ -30,65 +30,61 @@
       style="overflow-y: auto; overflow-x: auto;"
     >
       <!-- Enhanced Skeleton Loading with Quasar Components -->
-      <div v-if="isLoading && (!props.data || !props.data.rows || props.data.rows.length === 0)" class="w-full">
-        <table class="w-full border-collapse">
-          <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0">
+      <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="w-full">
+        <q-markup-table flat bordered class="skeleton-table">
+          <thead>
             <tr>
               <!-- Checkbox column skeleton -->
-              <th class="border-b border-gray-200 dark:border-gray-700 px-4 py-3 w-12">
-                <q-skeleton type="QCheckbox" />
+              <th class="text-left" style="width: 50px">
+                <q-skeleton type="QCheckbox" animation="wave" />
               </th>
-              <!-- Dynamic column skeletons based on actual columns if available -->
+              <!-- Expander column skeleton if expandable -->
+              <th v-if="props.data?.expandable" class="text-left" style="width: 50px">
+                <q-skeleton type="rect" width="24px" height="24px" animation="wave" />
+              </th>
+              <!-- Dynamic column skeletons based on actual columns -->
               <th 
-                v-for="i in (props.data?.columns?.length || 7)" 
+                v-for="(col, i) in (props.data?.columns || defaultSkeletonColumns)" 
                 :key="i" 
-                class="border-b border-gray-200 dark:border-gray-700 px-4 py-3"
+                class="text-left"
               >
-                <q-skeleton type="text" :width="`${60 + Math.random() * 40}%`" animation="wave" />
+                <q-skeleton type="text" animation="wave" />
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white dark:bg-gray-900">
-            <tr 
-              v-for="i in 15" 
-              :key="i" 
-              class="border-b border-gray-200 dark:border-gray-700"
-            >
+          <tbody>
+            <tr v-for="i in skeletonRowCount" :key="i">
               <!-- Checkbox cell skeleton -->
-              <td class="px-4 py-3">
+              <td>
                 <q-skeleton type="QCheckbox" animation="wave" />
               </td>
-              <!-- Data cell skeletons with varying widths for realism -->
+              <!-- Expander cell skeleton if expandable -->
+              <td v-if="props.data?.expandable">
+                <q-skeleton type="rect" width="24px" height="24px" animation="wave" />
+              </td>
+              <!-- Data cell skeletons with varying types for realism -->
               <td 
-                v-for="j in (props.data?.columns?.length || 7)" 
-                :key="j" 
-                class="px-4 py-3"
+                v-for="(col, j) in (props.data?.columns || defaultSkeletonColumns)" 
+                :key="j"
               >
                 <q-skeleton 
-                  type="text" 
-                  :width="`${50 + Math.random() * 50}%`"
+                  :type="getSkeletonType(col, j)" 
+                  :width="getSkeletonWidth(col, j)"
                   animation="wave"
                 />
               </td>
             </tr>
           </tbody>
-        </table>
-        
-        <!-- Loading indicator overlay -->
-        <div class="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-          <div class="flex flex-col items-center gap-3">
-            <q-spinner-dots size="50px" color="primary" />
-            <p class="text-sm text-gray-600 dark:text-gray-400 font-medium">Loading data...</p>
-          </div>
-        </div>
+        </q-markup-table>
       </div>
       
-      <!-- Custom Table using TanStack Table -->
-      <div v-else-if="!props.data || !props.data.columns || props.data.columns.length === 0" class="p-8 text-center text-gray-500">
+      <!-- No Data Message -->
+      <div v-else-if="!props.data?.rows || props.data.rows.length === 0" class="p-8 text-center text-gray-500">
         <div v-if="isLoading">Loading...</div>
         <div v-else>No data available</div>
       </div>
       
+      <!-- Data Table -->
       <table v-else class="w-full border-collapse" :key="tableKey">
         <!-- Header -->
         <thead class="bg-gray-50 sticky top-0 z-10">
@@ -245,10 +241,34 @@
         </tbody>
       </table>
 
-      <!-- Loading More Indicator (Infinite Scroll) -->
-      <div v-if="isFetchingNext" class="flex items-center justify-center py-4 bg-gray-50">
-        <q-spinner-dots size="30px" color="primary" />
-        <span class="ml-2 text-sm text-gray-600">Loading more data...</span>
+      <!-- Loading More Skeleton (Infinite Scroll) -->
+      <div v-if="isFetchingNext" class="w-full">
+        <q-markup-table flat bordered class="skeleton-table">
+          <tbody>
+            <tr v-for="i in 5" :key="`loading-${i}`">
+              <!-- Checkbox cell skeleton -->
+              <td style="width: 50px">
+                <q-skeleton type="QCheckbox" animation="wave" />
+              </td>
+              <!-- Expander cell skeleton if expandable -->
+              <td v-if="props.data?.expandable" style="width: 50px">
+                <q-skeleton type="rect" width="24px" height="24px" animation="wave" />
+              </td>
+              <!-- Data cell skeletons matching actual columns -->
+              <td 
+                v-for="(col, j) in (props.data?.columns || defaultSkeletonColumns)" 
+                :key="j"
+                :style="{ width: `${col.width || 150}px`, minWidth: `${col.minWidth || 100}px`, maxWidth: `${col.maxWidth || 500}px` }"
+              >
+                <q-skeleton 
+                  :type="getSkeletonType(col, j)" 
+                  :width="getSkeletonWidth(col, j)"
+                  animation="wave"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </q-markup-table>
       </div>
 
       <!-- Loading Overlay -->
@@ -939,6 +959,59 @@ const pageSizeOptions = computed(() => {
   return options
 })
 
+// Skeleton loading configuration
+const defaultSkeletonColumns = Array(7).fill({ id: 'skeleton', label: 'Loading...', type: 'string' })
+const skeletonRowCount = computed(() => {
+  // Show more skeleton rows for larger viewports
+  if (typeof window !== 'undefined') {
+    const viewportHeight = window.innerHeight
+    return Math.min(Math.floor(viewportHeight / 60), 20) // ~60px per row, max 20 rows
+  }
+  return 15
+})
+
+// Helper function to determine skeleton type based on column type
+const getSkeletonType = (col: any, index: number) => {
+  if (!col || !col.type) {
+    // Vary skeleton types for visual interest when no column info
+    const types = ['text', 'text', 'text', 'rect', 'text']
+    return types[index % types.length]
+  }
+  
+  switch (col.type) {
+    case 'number':
+      return 'text'
+    case 'boolean':
+      return 'QCheckbox'
+    case 'date':
+      return 'text'
+    default:
+      return 'text'
+  }
+}
+
+// Helper function to determine skeleton width based on column type
+const getSkeletonWidth = (col: any, index: number) => {
+  if (!col || !col.type) {
+    // Vary widths for visual interest
+    const widths = ['80%', '60%', '70%', '50%', '90%']
+    return widths[index % widths.length]
+  }
+  
+  switch (col.type) {
+    case 'number':
+      return '60%'
+    case 'boolean':
+      return '24px'
+    case 'date':
+      return '70%'
+    case 'select':
+      return '75%'
+    default:
+      return '80%'
+  }
+}
+
 // Helper functions
 const getColumnConfig = (columnId: string): ColumnConfig => {
   return props.data?.columns.find(col => col.id === columnId) || {
@@ -1173,6 +1246,24 @@ const getGridIdFromData = () => {
 </script>
 
 <style lang="sass" scoped>
+// Skeleton table styles
+.skeleton-table
+  :deep(thead)
+    background-color: #f5f5f5
+    
+  :deep(th)
+    padding: 12px 16px
+    font-weight: 500
+    
+  :deep(td)
+    padding: 12px 16px
+    
+  :deep(tbody tr)
+    transition: background-color 0.2s
+    
+    &:hover
+      background-color: #fafafa
+
 .grid-table
   table
     border-collapse: collapse

@@ -77,8 +77,33 @@
         </q-banner>
       </div>
       
-      <div v-else-if="isLoading" class="flex-1 flex items-center justify-center">
-        <q-spinner-dots size="50px" color="primary" />
+      <!-- Show skeleton on initial load -->
+      <div v-else-if="isLoading && !data" class="flex-1 overflow-hidden">
+        <GridToolbar :columns="[]" />
+        <div class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white m-6">
+          <q-markup-table flat bordered class="skeleton-table">
+            <thead>
+              <tr>
+                <th class="text-left" style="width: 50px">
+                  <q-skeleton type="QCheckbox" animation="wave" />
+                </th>
+                <th v-for="i in 7" :key="i" class="text-left">
+                  <q-skeleton type="text" animation="wave" />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="i in 15" :key="i">
+                <td>
+                  <q-skeleton type="QCheckbox" animation="wave" />
+                </td>
+                <td v-for="j in 7" :key="j">
+                  <q-skeleton type="text" :width="`${50 + (j * 10)}%`" animation="wave" />
+                </td>
+              </tr>
+            </tbody>
+          </q-markup-table>
+        </div>
       </div>
       
       <DataGrid 
@@ -348,4 +373,21 @@ const handleExport = async (selectedIds: string[]) => {
 <style lang="sass" scoped>
 .q-page
   min-height: 100vh
+
+.skeleton-table
+  :deep(thead)
+    background-color: #f5f5f5
+    
+  :deep(th)
+    padding: 12px 16px
+    font-weight: 500
+    
+  :deep(td)
+    padding: 12px 16px
+    
+  :deep(tbody tr)
+    transition: background-color 0.2s
+    
+    &:hover
+      background-color: #fafafa
 </style>
