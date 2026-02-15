@@ -7,7 +7,7 @@ import { useQuasar } from 'quasar';
 // Global state to track which cell is currently being updated
 const updatingCells = ref(new Set<string>());
 
-export function useGridUpdate(gridId: string = 'employees') {
+export function useGridUpdate(gridId: string) {
   const queryClient = useQueryClient();
   const $q = useQuasar();
 

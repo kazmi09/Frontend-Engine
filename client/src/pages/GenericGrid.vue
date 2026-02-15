@@ -4,7 +4,6 @@
     <header class="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
       <div class="flex items-center gap-4">
         <q-icon :name="gridIcon" size="md" class="text-primary" />
-        <h1 class="text-xl font-semibold">{{ gridTitle }}</h1>
       </div>
       
       <div class="flex items-center gap-2">
@@ -115,20 +114,21 @@ const $q = useQuasar()
 // Get gridId from route parameter
 const gridId = computed(() => route.params.gridId as string)
 
-// Grid metadata (you could fetch this from an API or config)
-const gridMetadata = computed(() => {
-  const metadata: Record<string, { title: string; icon: string }> = {
-    employees: { title: 'Employees', icon: 'people' },
-    users: { title: 'Users', icon: 'person' },
-    products: { title: 'Products', icon: 'inventory' },
-    orders: { title: 'Orders', icon: 'shopping_cart' },
-    customers: { title: 'Customers', icon: 'business' }
+// Fetch grid config to get metadata
+const { data: gridConfig } = useQuery({
+  queryKey: computed(() => ['gridConfig', gridId.value]),
+  queryFn: async () => {
+    const response = await fetch(`/api/grid/${gridId.value}/config`)
+    if (!response.ok) throw new Error('Failed to fetch grid config')
+    return response.json()
   }
-  return metadata[gridId.value] || { title: gridId.value, icon: 'table_chart' }
 })
 
-const gridTitle = computed(() => gridMetadata.value.title)
-const gridIcon = computed(() => gridMetadata.value.icon)
+// Grid metadata from config
+const gridTitle = computed(() => gridConfig.value?.name || gridId.value)
+const gridIcon = computed(() => gridConfig.value?.icon || 'table_chart')
+const displayName = computed(() => gridConfig.value?.displayName || 'item')
+const displayNamePlural = computed(() => gridConfig.value?.displayNamePlural || 'items')
 
 // Create generic API for current grid
 const gridApi = computed(() => createGridApi({ 
@@ -240,7 +240,7 @@ const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<str
     await gridApi.value.bulkEdit(data.selectedIds, data.updates)
     $q.notify({
       type: 'positive',
-      message: `Successfully updated ${data.selectedIds.length} records`,
+      message: `Successfully updated ${data.selectedIds.length} ${displayNamePlural.value}`,
       position: 'top'
     })
     gridStore.setRowSelection({})
@@ -248,7 +248,7 @@ const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<str
   } catch (error: any) {
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to update records',
+      message: error.message || `Failed to update ${displayNamePlural.value}`,
       position: 'top'
     })
   }
@@ -259,7 +259,7 @@ const handleBulkArchive = async (selectedIds: string[]) => {
     await gridApi.value.bulkArchive(selectedIds)
     $q.notify({
       type: 'positive',
-      message: `Successfully archived ${selectedIds.length} records`,
+      message: `Successfully archived ${selectedIds.length} ${displayNamePlural.value}`,
       position: 'top'
     })
     gridStore.setRowSelection({})
@@ -267,7 +267,7 @@ const handleBulkArchive = async (selectedIds: string[]) => {
   } catch (error: any) {
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to archive records',
+      message: error.message || `Failed to archive ${displayNamePlural.value}`,
       position: 'top'
     })
   }
@@ -278,7 +278,7 @@ const handleBulkDelete = async (selectedIds: string[]) => {
     await gridApi.value.bulkDelete(selectedIds)
     $q.notify({
       type: 'positive',
-      message: `Successfully deleted ${selectedIds.length} records`,
+      message: `Successfully deleted ${selectedIds.length} ${displayNamePlural.value}`,
       position: 'top'
     })
     gridStore.setRowSelection({})
@@ -286,7 +286,7 @@ const handleBulkDelete = async (selectedIds: string[]) => {
   } catch (error: any) {
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to delete records',
+      message: error.message || `Failed to delete ${displayNamePlural.value}`,
       position: 'top'
     })
   }
@@ -297,13 +297,13 @@ const handleExport = async (selectedIds: string[]) => {
     await gridApi.value.exportSelected(selectedIds)
     $q.notify({
       type: 'positive',
-      message: `Successfully exported ${selectedIds.length} records`,
+      message: `Successfully exported ${selectedIds.length} ${displayNamePlural.value}`,
       position: 'top'
     })
   } catch (error: any) {
     $q.notify({
       type: 'negative',
-      message: error.message || 'Failed to export records',
+      message: error.message || `Failed to export ${displayNamePlural.value}`,
       position: 'top'
     })
   }

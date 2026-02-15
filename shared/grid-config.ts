@@ -70,6 +70,9 @@ export interface GridConfig {
   id: string
   name: string
   description?: string
+  icon?: string // Icon for navigation/display
+  displayName?: string // Singular form (e.g., "User", "Product")
+  displayNamePlural?: string // Plural form (e.g., "Users", "Products")
   dataSource: GridDataSource
   columns: ColumnConfig[]
   expandable?: GridExpandableConfig
@@ -97,120 +100,14 @@ export interface GridConfig {
 
 // Grid configurations registry
 export const GRID_CONFIGS: Record<string, GridConfig> = {
-  employees: {
-    id: 'employees',
-    name: 'Employees',
-    description: 'Employee management grid',
-    dataSource: {
-      type: 'mysql',
-      connection: {
-        table: 'employees_temp',
-        primaryKey: 'employee_id',
-      }
-    },
-    columns: [
-      { 
-        id: "employee_id", 
-        label: "Employee ID", 
-        type: "number", 
-        width: 120, 
-        pinned: "left", 
-        editable: false 
-      },
-      { 
-        id: "first_name", 
-        label: "First Name", 
-        type: "string", 
-        width: 200, 
-        editable: true 
-      },
-      { 
-        id: "last_name", 
-        label: "Last Name", 
-        type: "string", 
-        width: 150, 
-        editable: true 
-      },
-      { 
-        id: "email", 
-        label: "Email", 
-        type: "string", 
-        width: 300, 
-        editable: true 
-      },
-      { 
-        id: "department", 
-        label: "Department", 
-        type: "string", 
-        width: 140, 
-        editable: true 
-      },
-      { 
-        id: "job_title", 
-        label: "Job Title", 
-        type: "string", 
-        width: 150, 
-        editable: true 
-      },
-      { 
-        id: "salary", 
-        label: "Salary", 
-        type: "string", 
-        width: 250, 
-        editable: true 
-      },
-      { 
-        id: "hire_date", 
-        label: "Hire Date", 
-        type: "date", 
-        width: 150, 
-        editable: true 
-      },
-    ],
-    expandable: {
-      enabled: true,
-      component: 'GenericDetailPanel',
-      requiredPermissions: ['admin', 'editor', 'viewer'],
-      canExpand: '() => true',
-      singleExpand: false,
-      defaultExpanded: false,
-      lazyLoad: false
-    },
-    bulkActions: {
-      enabled: true,
-      actions: {
-        edit: true,
-        delete: true,
-        archive: true,
-        export: true
-      }
-    },
-    permissions: {
-      read: ['admin', 'editor', 'viewer'],
-      create: ['admin', 'editor'],
-      update: ['admin', 'editor'],
-      delete: ['admin']
-    },
-    pagination: {
-      enabled: true,
-      defaultPageSize: 20,
-      pageSizeOptions: [10, 20, 50, 100]
-    },
-    search: {
-      enabled: true,
-      searchableColumns: ['employee_id', 'first_name', 'last_name', 'email', 'department', 'job_title']
-    },
-    filters: {
-      enabled: true,
-      filterableColumns: ['department', 'job_title']
-    }
-  },
-
   // DummyJSON Users API - Full CRUD support
   users: {
     id: 'users',
     name: 'Users',
     description: 'User management grid with DummyJSON API',
+    icon: 'group',
+    displayName: 'user',
+    displayNamePlural: 'users',
     dataSource: {
       type: 'api',
       api: {
@@ -288,6 +185,9 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     id: 'products',
     name: 'Products',
     description: 'Product catalog from DummyJSON API',
+    icon: 'inventory_2',
+    displayName: 'product',
+    displayNamePlural: 'products',
     dataSource: {
       type: 'api',
       api: {

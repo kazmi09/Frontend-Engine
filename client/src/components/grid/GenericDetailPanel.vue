@@ -437,16 +437,6 @@ const formatFieldValue = (field: ColumnConfig, value: any) => {
       }
     
     case 'number':
-      if (field.id.toLowerCase().includes('salary') || field.id.toLowerCase().includes('price')) {
-        const numValue = typeof value === 'string' ? parseFloat(value) : value
-        if (!isNaN(numValue)) {
-          return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-          }).format(numValue)
-        }
-      }
       return value
     
     case 'boolean':

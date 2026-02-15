@@ -364,33 +364,16 @@ export class GenericQueryBuilder {
         const primaryKeyValue = String(id).split('-')[0]
 
         try {
-          // Handle salary adjustment
-          if (updates._salaryAdjustment) {
-            const { type, value } = updates._salaryAdjustment
-            let salaryUpdateQuery = ""
-
-            if (type === 'percentage') {
-              salaryUpdateQuery = `UPDATE ${connection.table} SET salary = ROUND(salary * (1 + ? / 100), 2) WHERE ${connection.primaryKey} = ?`
-              await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
-            } else if (type === 'amount') {
-              salaryUpdateQuery = `UPDATE ${connection.table} SET salary = salary + ? WHERE ${connection.primaryKey} = ?`
-              await connection_db.execute(salaryUpdateQuery, [value, primaryKeyValue])
-            }
-            updatedCount++
-          }
-
           // Handle regular field updates
           for (const [field, value] of Object.entries(updates)) {
-            if (field === '_salaryAdjustment') continue
-
             // Validate field is editable
             const column = this.config.columns.find(col => col.id === field)
             if (!column || column.editable === false) continue
 
             const updateQuery = `UPDATE ${connection.table} SET ${field} = ? WHERE ${connection.primaryKey} = ?`
             await connection_db.execute(updateQuery, [value, primaryKeyValue])
-            updatedCount++
           }
+          updatedCount++
         } catch (error: any) {
           // Collect errors but continue with other rows
           if (error.code === 'ER_DUP_ENTRY') {

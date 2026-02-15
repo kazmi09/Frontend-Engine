@@ -70,33 +70,6 @@
               :placeholder="`Update ${column.label.toLowerCase()}`"
             />
           </div>
-          
-          <!-- Special Salary Adjustment for Admin -->
-          <div v-if="hasSalaryColumn" class="border-t pt-4">
-            <label class="text-sm font-medium text-gray-700 mb-2 block">
-              Salary Adjustment
-            </label>
-            <div class="flex gap-2">
-              <q-select
-                v-model="salaryAdjustmentType"
-                :options="salaryAdjustmentOptions"
-                outlined
-                dense
-                style="min-width: 120px"
-              />
-              <q-input
-                v-model.number="salaryAdjustmentValue"
-                type="number"
-                outlined
-                dense
-                :placeholder="salaryAdjustmentType === 'percentage' ? 'Percentage' : 'Amount'"
-                :suffix="salaryAdjustmentType === 'percentage' ? '%' : '$'"
-              />
-            </div>
-            <div class="text-caption text-grey-6 mt-1">
-              {{ salaryAdjustmentType === 'percentage' ? 'Increase/decrease salary by percentage' : 'Add/subtract fixed amount' }}
-            </div>
-          </div>
         </div>
       </q-card-section>
 
@@ -132,15 +105,6 @@ const emit = defineEmits<{
 // Form data
 const formData = ref<Record<string, any>>({})
 
-// Salary adjustment
-const salaryAdjustmentType = ref<'percentage' | 'amount'>('percentage')
-const salaryAdjustmentValue = ref<number | null>(null)
-
-const salaryAdjustmentOptions = [
-  { label: 'Percentage', value: 'percentage' },
-  { label: 'Fixed Amount', value: 'amount' }
-]
-
 const booleanOptions = [
   { label: 'Yes', value: true },
   { label: 'No', value: false }
@@ -152,16 +116,10 @@ const isOpen = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-const hasSalaryColumn = computed(() => {
-  return props.columns.some(col => col.id === 'salary')
-})
-
 const hasChanges = computed(() => {
-  const hasFormChanges = Object.values(formData.value).some(value => 
+  return Object.values(formData.value).some(value => 
     value !== null && value !== undefined && value !== ''
   )
-  const hasSalaryChanges = salaryAdjustmentValue.value !== null && salaryAdjustmentValue.value !== undefined
-  return hasFormChanges || hasSalaryChanges
 })
 
 // Methods
@@ -173,7 +131,7 @@ const cancel = () => {
 const save = () => {
   const updates: Record<string, any> = {}
   
-  // Add regular field updates
+  // Add field updates
   Object.keys(formData.value).forEach(key => {
     const value = formData.value[key]
     if (value !== null && value !== undefined && value !== '') {
@@ -181,22 +139,12 @@ const save = () => {
     }
   })
   
-  // Add salary adjustment if specified
-  if (salaryAdjustmentValue.value !== null && salaryAdjustmentValue.value !== undefined) {
-    updates._salaryAdjustment = {
-      type: salaryAdjustmentType.value,
-      value: salaryAdjustmentValue.value
-    }
-  }
-  
   emit('save', updates)
   resetForm()
 }
 
 const resetForm = () => {
   formData.value = {}
-  salaryAdjustmentType.value = 'percentage'
-  salaryAdjustmentValue.value = null
 }
 
 // Reset form when dialog opens
