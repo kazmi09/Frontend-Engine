@@ -96,6 +96,19 @@ export interface GridConfig {
     enabled: boolean
     filterableColumns: string[]
   }
+  grouping?: {
+    enabled: boolean
+    allowMultipleGroups?: boolean
+    collapsible?: boolean
+    defaultCollapsed?: boolean
+    showGroupCount?: boolean
+    showGroupSummary?: boolean
+    summaryFields?: {
+      field: string
+      aggregation: 'sum' | 'avg' | 'min' | 'max' | 'count'
+      label?: string
+    }[]
+  }
 }
 
 // Grid configurations registry
@@ -177,6 +190,19 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     filters: {
       enabled: true,
       filterableColumns: ['gender', 'role', 'bloodGroup', 'eyeColor']
+    },
+    grouping: {
+      enabled: true,
+      allowMultipleGroups: true,
+      collapsible: true,
+      defaultCollapsed: false,
+      showGroupCount: true,
+      showGroupSummary: true,
+      summaryFields: [
+        { field: 'age', aggregation: 'avg', label: 'Avg Age' },
+        { field: 'height', aggregation: 'avg', label: 'Avg Height' },
+        { field: 'weight', aggregation: 'avg', label: 'Avg Weight' }
+      ]
     }
   },
 
@@ -246,6 +272,19 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     filters: {
       enabled: true,
       filterableColumns: ['category', 'brand']
+    },
+    grouping: {
+      enabled: true,
+      allowMultipleGroups: true,
+      collapsible: true,
+      defaultCollapsed: false,
+      showGroupCount: true,
+      showGroupSummary: true,
+      summaryFields: [
+        { field: 'price', aggregation: 'avg', label: 'Avg Price' },
+        { field: 'stock', aggregation: 'sum', label: 'Total Stock' },
+        { field: 'rating', aggregation: 'avg', label: 'Avg Rating' }
+      ]
     }
   }
 }

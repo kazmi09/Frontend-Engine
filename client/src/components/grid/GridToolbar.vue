@@ -86,6 +86,46 @@
         <q-tooltip>Reset Layout</q-tooltip>
       </q-btn>
 
+      <!-- Grouping -->
+      <q-btn-dropdown
+        v-if="groupableColumns.length > 0"
+        flat
+        icon="workspaces"
+        label="Group By"
+        dropdown-icon="expand_more"
+      >
+        <q-list>
+          <q-item
+            v-for="column in groupableColumns"
+            :key="column.id"
+            clickable
+            @click="toggleGrouping(column.id)"
+          >
+            <q-item-section side>
+              <q-checkbox
+                :model-value="isGroupedBy(column.id)"
+                @update:model-value="toggleGrouping(column.id)"
+              />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>{{ column.label }}</q-item-label>
+            </q-item-section>
+          </q-item>
+          
+          <q-separator v-if="hasActiveGrouping" />
+          
+          <q-item
+            v-if="hasActiveGrouping"
+            clickable
+            @click="clearGrouping"
+          >
+            <q-item-section>
+              <q-item-label class="tw-text-red-600">Clear Grouping</q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </q-btn-dropdown>
+
       <!-- Export (placeholder) -->
       <q-btn
         flat
@@ -107,6 +147,7 @@ import { useQuasar } from 'quasar'
 
 const props = defineProps<{
   columns?: ColumnConfig[]
+  groupableColumns?: string[] // List of column IDs that can be grouped
 }>()
 
 const emit = defineEmits<{
@@ -123,7 +164,8 @@ const {
   filters,
   columnVisibility,
   hasFilters,
-  hasSearch
+  hasSearch,
+  grouping
 } = storeToRefs(gridStore)
 
 // Available columns for filtering
@@ -137,6 +179,17 @@ const filterOptions = computed(() => {
 
 // Available columns for visibility toggle
 const availableColumns = computed(() => props.columns || [])
+
+// Groupable columns - filter by groupableColumns prop or allow all
+const groupableColumns = computed(() => {
+  if (!props.columns) return []
+  if (!props.groupableColumns || props.groupableColumns.length === 0) {
+    // If no specific groupable columns defined, allow all columns
+    return props.columns
+  }
+  // Filter to only groupable columns
+  return props.columns.filter(col => props.groupableColumns?.includes(col.id))
+})
 
 // Active filters count
 const hasActiveFilters = computed(() => hasFilters.value || hasSearch.value)
@@ -183,6 +236,34 @@ const exportData = () => {
     message: 'Export functionality coming soon',
     position: 'top-right'
   })
+}
+
+// Grouping helpers
+const isGroupedBy = (columnId: string) => {
+  return grouping.value.includes(columnId)
+}
+
+const hasActiveGrouping = computed(() => {
+  return grouping.value.length > 0
+})
+
+const toggleGrouping = (columnId: string) => {
+  const currentGrouping = [...grouping.value]
+  const index = currentGrouping.indexOf(columnId)
+  
+  if (index >= 0) {
+    // Remove from grouping
+    currentGrouping.splice(index, 1)
+  } else {
+    // Add to grouping
+    currentGrouping.push(columnId)
+  }
+  
+  gridStore.setGrouping(currentGrouping)
+}
+
+const clearGrouping = () => {
+  gridStore.setGrouping([])
 }
 </script>
 

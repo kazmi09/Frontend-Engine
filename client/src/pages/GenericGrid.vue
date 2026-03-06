@@ -31,6 +31,7 @@
     <!-- Grid Toolbar -->
     <GridToolbar 
       :columns="data?.columns"
+      :groupable-columns="data?.grouping?.enabled ? (data?.columns?.map(c => c.id) || []) : []"
       @column-visibility-changed="handleColumnVisibilityChanged"
     />
 

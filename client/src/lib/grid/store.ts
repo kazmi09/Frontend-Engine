@@ -9,6 +9,8 @@ const initialState: GridState = {
   columnPinning: { left: [], right: [] },
   columnSizing: {},
   sorting: [],
+  grouping: [],
+  groupExpanded: {},
 }
 
 export const useGridStore = defineStore('grid', () => {
@@ -34,6 +36,10 @@ export const useGridStore = defineStore('grid', () => {
   // Expansion state
   const expandedRows = ref<Record<string, boolean>>({})
   const detailPanelData = ref<DetailPanelState>({})
+  
+  // Grouping state
+  const grouping = ref<string[]>(initialState.grouping)
+  const groupExpanded = ref<Record<string, boolean>>(initialState.groupExpanded)
   
   // Computed
   const hasFilters = computed(() => Object.keys(filters.value).length > 0)
@@ -211,6 +217,32 @@ export const useGridStore = defineStore('grid', () => {
     })
   }
   
+  // Grouping actions
+  const setGrouping = (fields: string[]) => {
+    grouping.value = fields
+    // Reset group expansion when grouping changes
+    groupExpanded.value = {}
+  }
+  
+  const toggleGroupExpansion = (groupKey: string) => {
+    groupExpanded.value = {
+      ...groupExpanded.value,
+      [groupKey]: !groupExpanded.value[groupKey]
+    }
+  }
+  
+  const expandAllGroups = (groupKeys: string[]) => {
+    const newExpanded = { ...groupExpanded.value }
+    groupKeys.forEach(key => {
+      newExpanded[key] = true
+    })
+    groupExpanded.value = newExpanded
+  }
+  
+  const collapseAllGroups = () => {
+    groupExpanded.value = {}
+  }
+  
   return {
     // State
     columnVisibility,
@@ -249,6 +281,10 @@ export const useGridStore = defineStore('grid', () => {
     expandedRows,
     detailPanelData,
     
+    // Grouping state
+    grouping,
+    groupExpanded,
+    
     // Expansion actions
     expandRow,
     collapseRow,
@@ -259,5 +295,11 @@ export const useGridStore = defineStore('grid', () => {
     setDetailPanelLoading,
     setDetailPanelError,
     cleanupExpandedRows,
+    
+    // Grouping actions
+    setGrouping,
+    toggleGroupExpansion,
+    expandAllGroups,
+    collapseAllGroups,
   }
 })

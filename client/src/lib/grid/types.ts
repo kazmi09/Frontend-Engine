@@ -12,6 +12,23 @@ export interface ColumnConfig {
   requiredPermissions?: string[] // Permissions needed to view/edit this column
 }
 
+export interface GroupingConfig {
+  enabled: boolean
+  groupBy?: string[] // Fields to group by (in order of priority)
+  defaultGroupBy?: string[] // Default grouping fields
+  allowMultipleGroups?: boolean // Allow grouping by multiple fields
+  collapsible?: boolean // Allow collapsing/expanding groups
+  defaultCollapsed?: boolean // Start with groups collapsed
+  showGroupCount?: boolean // Show count of items in group
+  showGroupSummary?: boolean // Show summary row for each group
+  summaryFields?: {
+    field: string
+    aggregation: 'sum' | 'avg' | 'min' | 'max' | 'count'
+    label?: string
+  }[]
+  customGroupHeader?: (groupValue: any, field: string, count: number) => string
+}
+
 export interface ExpandableConfig {
   renderer?: any // Vue component for rendering expanded content
   requiredPermissions?: string[]
@@ -32,6 +49,7 @@ export interface DataResult {
     totalRows: number
   }
   expandable?: ExpandableConfig
+  grouping?: GroupingConfig
   gridId?: string
 }
 
@@ -48,6 +66,8 @@ export interface GridState {
   };
   columnSizing: Record<string, number>;
   sorting: { id: string; desc: boolean }[];
+  grouping: string[]; // Fields currently being grouped by
+  groupExpanded: Record<string, boolean>; // Track which groups are expanded
 }
 
 export interface FilterState {
@@ -77,6 +97,19 @@ export interface ColumnMetaProperties {
   pinned?: 'left' | 'right';
   reorderable?: boolean;
   resizable?: boolean;
+}
+
+// Group row type
+export interface GroupRow {
+  isGroupHeader: true;
+  groupField: string;
+  groupValue: any;
+  groupLabel: string;
+  count: number;
+  rows: any[];
+  isExpanded: boolean;
+  level: number; // For nested grouping
+  summary?: Record<string, any>;
 }
 
 // Extend TanStack Table's ColumnMeta type

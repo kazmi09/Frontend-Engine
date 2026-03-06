@@ -173,16 +173,83 @@
           <template v-for="virtualRow in rowVirtualizer.getVirtualItems()" :key="virtualRow.index">
             <template v-if="table?.getRowModel?.()?.rows[virtualRow.index]">
               <template v-for="row in [table.getRowModel().rows[virtualRow.index]]" :key="row.id">
-                <!-- Main Row -->
+                <!-- Debug: Log row info -->
+                <template v-if="false">
+                  {{ console.log('Row:', { 
+                    id: row.id, 
+                    depth: row.depth, 
+                    getIsGrouped: row.getIsGrouped,
+                    subRows: row.subRows?.length,
+                    original: row.original 
+                  }) }}
+                </template>
+                
+                <!-- Group Header Row (TanStack Table native grouping) -->
                 <tr 
+                  v-if="grouping.length > 0 && row.getIsGrouped"
+                  :key="`group-${row.id}`"
+                  class="tw-bg-gray-100 dark:tw-bg-gray-800 tw-font-medium hover:tw-bg-gray-200 dark:hover:tw-bg-gray-700 tw-cursor-pointer"
+                  @click="row.toggleExpanded()"
+                >
+                  <td 
+                    :colspan="columns.length" 
+                    class="tw-px-4 tw-py-3 tw-border-b tw-border-gray-200"
+                    :style="{ paddingLeft: `${row.depth * 2 + 1}rem` }"
+                  >
+                    <div class="tw-flex tw-items-center tw-gap-2">
+                      <!-- Expand/Collapse Icon -->
+                      <q-icon 
+                        :name="row.getIsExpanded() ? 'expand_more' : 'chevron_right'"
+                        size="sm"
+                        class="tw-text-gray-600 dark:tw-text-gray-400"
+                      />
+                      
+                      <!-- Group Value - Get the actual grouped value -->
+                      <span class="tw-text-sm tw-font-semibold">
+                        <template v-for="cell in row.getVisibleCells()" :key="cell.id">
+                          <template v-if="cell.getIsGrouped()">
+                            {{ cell.column.columnDef.header }}: {{ cell.getValue() || '(Empty)' }}
+                          </template>
+                        </template>
+                      </span>
+                      
+                      <!-- Count Badge -->
+                      <q-badge 
+                        :label="row.subRows.length"
+                        color="primary"
+                        class="tw-ml-2"
+                      />
+                      
+                      <!-- Aggregated Values (only show when expanded) -->
+                      <template v-if="row.getIsExpanded()">
+                        <div 
+                          v-for="cell in row.getVisibleCells().filter(c => c.getIsAggregated() && !c.getIsGrouped())" 
+                          :key="cell.id"
+                          class="tw-text-xs tw-text-gray-600 dark:tw-text-gray-400 tw-ml-4"
+                        >
+                          <span class="tw-font-medium">{{ cell.column.columnDef.header }}:</span>
+                          <span class="tw-ml-1">{{ typeof cell.renderValue() === 'number' ? cell.renderValue().toFixed(1) : cell.renderValue() }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </td>
+                </tr>
+                
+                <!-- Main Data Row - Only render if it's a leaf row (not a group) -->
+                <tr 
+                  v-else-if="!row.getIsGrouped"
                   :class="getRowClass(row)"
-                  class="hover:bg-gray-50"
+                  class="hover:tw-bg-gray-50"
                 >
                   <td
                     v-for="cell in (row?.getVisibleCells?.() || [])"
                     :key="cell.id"
-                    :style="{ width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px` }"
-                    class="border-b border-gray-200 px-4 py-3 text-sm overflow-hidden"
+                    :style="{ 
+                      width: `${cell.column.getSize()}px`, 
+                      minWidth: `${cell.column.getSize()}px`, 
+                      maxWidth: `${cell.column.getSize()}px`
+                    }"
+                    class="tw-border-b tw-border-gray-200 tw-px-4 tw-py-3 tw-text-sm tw-overflow-hidden"
                   >
                     <!-- Expander Cell -->
                     <ExpanderCell
@@ -200,10 +267,10 @@
                       />
                     </template>
                     
-                    <!-- Regular Cell -->
+                    <!-- Regular Cell - Get value from original row data -->
                     <EditableCell
                       v-else
-                      :value="cell.getValue()"
+                      :value="row.original[cell.column.id]"
                       :row-id="row.original.id"
                       :column="getColumnConfig(cell.column.id)"
                       :width="cell.column.getSize()"
@@ -213,8 +280,8 @@
                 </tr>
                 
                 <!-- Detail Panel Row -->
-                <tr v-if="row.getIsExpanded?.()" :key="`${row.id}-detail`">
-                  <td :colspan="row.getVisibleCells().length" class="p-0">
+                <tr v-if="!(grouping.length > 0 && row.getIsGrouped) && row.getIsExpanded?.()" :key="`${row.id}-detail`">
+                  <td :colspan="row.getVisibleCells().length" class="tw-p-0">
                     <DetailPanel
                       :row="row.original"
                       :row-id="row.original.id"
@@ -330,6 +397,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   getExpandedRowModel,
+  getGroupedRowModel,
   type ColumnDef,
 } from '@tanstack/vue-table'
 import { useGridStore } from '@/lib/grid/store'
@@ -384,6 +452,8 @@ const {
   pageSize,
   rowSelection,
   expandedRows,
+  grouping,
+  groupExpanded
 } = storeToRefs(gridStore)
 
 const { user } = storeToRefs(authStore)
@@ -414,6 +484,7 @@ const columns = computed<ColumnDef<any>[]>(() => {
       cell: ({ row }) => row.original,
       enableSorting: false,
       enableHiding: false,
+      enableGrouping: false,
       size: 50,
       minSize: 50,
       maxSize: 50,
@@ -431,6 +502,7 @@ const columns = computed<ColumnDef<any>[]>(() => {
     cell: ({ row }) => row.getIsSelected(),
     enableSorting: false,
     enableHiding: false,
+    enableGrouping: false,
     size: 50,
     minSize: 50,
     maxSize: 50,
@@ -449,9 +521,12 @@ const columns = computed<ColumnDef<any>[]>(() => {
     minSize: col.minWidth || 100,
     maxSize: col.maxWidth || 500,
     enableSorting: true,
-    enableHiding: true, // Make sure this is true
+    enableHiding: true,
+    enableGrouping: true, // Enable grouping for data columns
+    // Aggregation function for grouped rows
+    aggregationFn: col.type === 'number' ? 'mean' : 'count',
     meta: {
-      columnConfig: col, // Store the original column config
+      columnConfig: col,
       reorderable: true,
       resizable: true
     }
@@ -463,10 +538,7 @@ const columns = computed<ColumnDef<any>[]>(() => {
 
 // Table instance with reactive state
 const table = useVueTable({
-  data: computed(() => {
-    const rows = props.data?.rows || []
-    return rows
-  }),
+  data: computed(() => props.data?.rows || []),
   get columns() { 
     return columns.value 
   },
@@ -499,6 +571,9 @@ const table = useVueTable({
     },
     get sorting() { 
       return sorting.value 
+    },
+    get grouping() {
+      return grouping.value
     },
     get rowSelection() { 
       return rowSelection.value 
@@ -538,6 +613,11 @@ const table = useVueTable({
   onSortingChange: (updater) => {
     console.log('onSortingChange called with:', updater)
     gridStore.setSorting(updater)
+  },
+  onGroupingChange: (updater) => {
+    const newGrouping = typeof updater === 'function' ? updater(grouping.value) : updater
+    console.log('[DataGrid] Grouping changed:', newGrouping)
+    gridStore.setGrouping(newGrouping)
   },
   onRowSelectionChange: gridStore.setRowSelection,
   onExpandedChange: (updater) => {
@@ -598,6 +678,7 @@ const table = useVueTable({
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
+  getGroupedRowModel: getGroupedRowModel(),
   getRowId: (row, index) => {
     // Use the primary key from the data result, fallback to 'id'
     const primaryKey = props.data?.primaryKey || 'id'
@@ -615,10 +696,13 @@ const table = useVueTable({
   },
   manualPagination: true,
   manualSorting: false, // Let TanStack Table handle sorting
+  manualGrouping: false, // Let TanStack Table handle grouping
   enableRowSelection: true,
   enableExpanding: true,
+  enableGrouping: true,
   enableColumnResizing: true,
   columnResizeMode: "onChange",
+  groupedColumnMode: false, // Don't hide grouped columns
 })
 
 // Virtual scrolling setup
