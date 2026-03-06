@@ -186,68 +186,80 @@
                 
                 <!-- Group Header Row (TanStack Table native grouping) -->
                 <tr 
-                  v-if="grouping.length > 0 && row.getIsGrouped"
+                  v-if="grouping.length > 0 && row.getIsGrouped()"
                   :key="`group-${row.id}`"
-                  class="tw-bg-gray-100 dark:tw-bg-gray-800 tw-font-medium hover:tw-bg-gray-200 dark:hover:tw-bg-gray-700 tw-cursor-pointer"
+                  class="group-header-row"
+                  :class="{
+                    'group-level-0': row.depth === 0,
+                    'group-level-1': row.depth === 1,
+                    'group-level-2': row.depth >= 2,
+                  }"
                   @click="row.toggleExpanded()"
                 >
                   <td 
                     :colspan="columns.length" 
-                    class="tw-px-4 tw-py-3 tw-border-b tw-border-gray-200"
-                    :style="{ paddingLeft: `${row.depth * 2 + 1}rem` }"
+                    class="group-header-cell"
+                    :style="{ paddingLeft: `${(row.depth * 1.5) + 1}rem` }"
                   >
-                    <div class="tw-flex tw-items-center tw-gap-2">
+                    <div class="tw-flex tw-items-center tw-gap-3">
                       <!-- Expand/Collapse Icon -->
                       <q-icon 
                         :name="row.getIsExpanded() ? 'expand_more' : 'chevron_right'"
-                        size="sm"
-                        class="tw-text-gray-600 dark:tw-text-gray-400"
+                        size="md"
+                        class="group-expand-icon"
                       />
                       
-                      <!-- Group Value - Get the actual grouped value -->
-                      <span class="tw-text-sm tw-font-semibold">
-                        <template v-for="cell in row.getVisibleCells()" :key="cell.id">
-                          <template v-if="cell.getIsGrouped()">
-                            {{ cell.column.columnDef.header }}: {{ cell.getValue() || '(Empty)' }}
+                      <!-- Group Value Display -->
+                      <div class="tw-flex tw-items-center tw-gap-2 tw-flex-1">
+                        <span class="group-label">
+                          <template v-for="cell in row.getVisibleCells()" :key="cell.id">
+                            <template v-if="cell.getIsGrouped()">
+                              <span class="group-column-name">{{ cell.column.columnDef.header }}:</span>
+                              <span class="group-value">{{ formatGroupValue(cell.getValue()) }}</span>
+                            </template>
                           </template>
-                        </template>
-                      </span>
+                        </span>
+                        
+                        <!-- Count Badge with proper formatting -->
+                        <q-badge 
+                          :label="formatGroupCount(getLeafRowCount(row))"
+                          color="primary"
+                          class="group-count-badge"
+                        />
+                      </div>
                       
-                      <!-- Count Badge -->
-                      <q-badge 
-                        :label="row.subRows.length"
-                        color="primary"
-                        class="tw-ml-2"
-                      />
-                      
-                      <!-- Aggregated Values (only show when expanded) -->
-                      <template v-if="row.getIsExpanded()">
+                      <!-- Aggregated Values -->
+                      <div 
+                        v-if="row.getIsExpanded() && hasAggregations(row)"
+                        class="tw-flex tw-items-center tw-gap-4 tw-ml-4"
+                      >
                         <div 
                           v-for="cell in row.getVisibleCells().filter(c => c.getIsAggregated() && !c.getIsGrouped())" 
                           :key="cell.id"
-                          class="tw-text-xs tw-text-gray-600 dark:tw-text-gray-400 tw-ml-4"
+                          class="aggregation-item"
                         >
-                          <span class="tw-font-medium">{{ cell.column.columnDef.header }}:</span>
-                          <span class="tw-ml-1">{{ typeof cell.renderValue() === 'number' ? cell.renderValue().toFixed(1) : cell.renderValue() }}</span>
+                          <span class="aggregation-label">{{ cell.column.columnDef.header }}:</span>
+                          <span class="aggregation-value">{{ formatAggregationValue(cell.renderValue(), cell.column.columnDef.meta?.columnConfig?.type) }}</span>
                         </div>
-                      </template>
+                      </div>
                     </div>
                   </td>
                 </tr>
                 
                 <!-- Main Data Row - Only render if it's a leaf row (not a group) -->
                 <tr 
-                  v-else-if="!row.getIsGrouped"
+                  v-else-if="!row.getIsGrouped()"
                   :class="getRowClass(row)"
-                  class="hover:tw-bg-gray-50"
+                  class="hover:tw-bg-gray-50 data-row"
                 >
                   <td
-                    v-for="cell in (row?.getVisibleCells?.() || [])"
+                    v-for="(cell, cellIndex) in (row?.getVisibleCells?.() || [])"
                     :key="cell.id"
                     :style="{ 
                       width: `${cell.column.getSize()}px`, 
                       minWidth: `${cell.column.getSize()}px`, 
-                      maxWidth: `${cell.column.getSize()}px`
+                      maxWidth: `${cell.column.getSize()}px`,
+                      paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
                     }"
                     class="tw-border-b tw-border-gray-200 tw-px-4 tw-py-3 tw-text-sm tw-overflow-hidden"
                   >
@@ -513,24 +525,45 @@ const columns = computed<ColumnDef<any>[]>(() => {
     }
   }
 
-  const dataColumns: ColumnDef<any>[] = props.data.columns.map((col) => ({
-    id: col.id,
-    accessorKey: col.id,
-    header: col.label,
-    size: col.width || 150,
-    minSize: col.minWidth || 100,
-    maxSize: col.maxWidth || 500,
-    enableSorting: true,
-    enableHiding: true,
-    enableGrouping: true, // Enable grouping for data columns
-    // Aggregation function for grouped rows
-    aggregationFn: col.type === 'number' ? 'mean' : 'count',
-    meta: {
-      columnConfig: col,
-      reorderable: true,
-      resizable: true
+  const dataColumns: ColumnDef<any>[] = props.data.columns.map((col) => {
+    // Determine aggregation function based on column type
+    let aggregationFn: string | undefined
+    if (col.type === 'number') {
+      aggregationFn = 'mean' // Use mean for numeric columns
+    } else if (col.type === 'boolean') {
+      aggregationFn = 'count' // Count for boolean columns
+    } else {
+      aggregationFn = undefined // No aggregation for string/date/select by default
     }
-  }))
+    
+    return {
+      id: col.id,
+      accessorKey: col.id,
+      header: col.label,
+      size: col.width || 150,
+      minSize: col.minWidth || 100,
+      maxSize: col.maxWidth || 500,
+      enableSorting: true,
+      enableHiding: true,
+      enableGrouping: true, // Enable grouping for data columns
+      // Aggregation function for grouped rows
+      aggregationFn: aggregationFn,
+      // Custom aggregation renderer
+      aggregatedCell: ({ getValue }: any) => {
+        const value = getValue()
+        if (value === null || value === undefined) return '-'
+        if (typeof value === 'number') {
+          return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)
+        }
+        return String(value)
+      },
+      meta: {
+        columnConfig: col,
+        reorderable: true,
+        resizable: true
+      }
+    }
+  })
 
   cols.push(selectColumn, ...dataColumns)
   return cols
@@ -1327,6 +1360,81 @@ const getGridIdFromData = () => {
   console.log('[DataGrid] Using gridId:', gridId, 'from props.data?.gridId:', props.data?.gridId)
   return gridId
 }
+
+// Helper function to format group value
+const formatGroupValue = (value: any): string => {
+  if (value === null || value === undefined) return '(Empty)'
+  if (value === '') return '(Blank)'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  return String(value)
+}
+
+// Helper function to format group count
+const formatGroupCount = (count: number): string => {
+  // Try to get display name from grouping config, fallback to generic terms
+  const displayName = 'user' // Could be enhanced to get from grid config
+  const displayNamePlural = 'users'
+  return `${count} ${count === 1 ? displayName : displayNamePlural}`
+}
+
+// Helper function to format aggregation value
+const formatAggregationValue = (value: any, columnType?: string): string => {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'number') {
+    if (columnType === 'number') {
+      // Format numbers with appropriate decimal places
+      return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2)
+    }
+    return value.toLocaleString()
+  }
+  return String(value)
+}
+
+// Helper function to check if row has aggregations
+const hasAggregations = (row: any): boolean => {
+  const cells = row.getVisibleCells()
+  return cells.some((cell: any) => cell.getIsAggregated() && !cell.getIsGrouped())
+}
+
+// Helper function to calculate cell padding left for indentation
+const getCellPaddingLeft = (cell: any, cellIndex: number, row: any): string | undefined => {
+  // If it's a placeholder cell, use minimal padding
+  if (cell.getIsPlaceholder()) {
+    return '0.5rem'
+  }
+  
+  // If grouping is active and this is the first data column (after expander/select), apply indentation
+  if (grouping.value.length > 0 && row.depth > 0) {
+    const visibleCells = row.getVisibleCells()
+    const firstDataCellIndex = visibleCells.findIndex((c: any) => 
+      c.column.id !== 'expander' && c.column.id !== 'select' && !c.getIsPlaceholder()
+    )
+    
+    if (cellIndex === firstDataCellIndex) {
+      return `${(row.depth * 1.5) + 1}rem`
+    }
+  }
+  
+  return undefined
+}
+
+// Helper function to count leaf rows (actual data rows) in a group
+const getLeafRowCount = (row: any): number => {
+  // If the row has subRows, recursively count leaf rows
+  if (row.subRows && row.subRows.length > 0) {
+    return row.subRows.reduce((count: number, subRow: any) => {
+      if (subRow.getIsGrouped && subRow.getIsGrouped()) {
+        // If it's a nested group, count its leaf rows
+        return count + getLeafRowCount(subRow)
+      } else {
+        // If it's a data row, count it
+        return count + 1
+      }
+    }, 0)
+  }
+  // If no subRows, it's a leaf row itself
+  return 1
+}
 </script>
 
 <style lang="sass" scoped>
@@ -1410,6 +1518,73 @@ table
     height: 53px
     max-height: 53px
     box-sizing: border-box
+
+// Group header row styles
+.group-header-row
+  background-color: #f3f4f6
+  border-bottom: 2px solid #e5e7eb
+  cursor: pointer
+  transition: background-color 0.2s ease
+  font-weight: 600
+  
+  &:hover
+    background-color: #e5e7eb
+  
+  &.group-level-0
+    background-color: #f3f4f6
+    font-weight: 700
+    
+  &.group-level-1
+    background-color: #f9fafb
+    font-weight: 600
+    
+  &.group-level-2
+    background-color: #fafbfc
+    font-weight: 500
+
+.group-header-cell
+  padding: 0.875rem 1rem
+  border-bottom: 2px solid #e5e7eb
+
+.group-expand-icon
+  color: #6b7280
+  flex-shrink: 0
+  transition: transform 0.2s ease
+
+.group-label
+  font-size: 0.875rem
+  font-weight: inherit
+  color: #111827
+
+.group-column-name
+  color: #6b7280
+  font-weight: 500
+  margin-right: 0.25rem
+
+.group-value
+  color: #111827
+  font-weight: inherit
+
+.group-count-badge
+  font-size: 0.75rem
+  font-weight: 600
+  padding: 0.125rem 0.5rem
+
+.aggregation-item
+  font-size: 0.75rem
+  color: #6b7280
+
+.aggregation-label
+  font-weight: 500
+  margin-right: 0.25rem
+
+.aggregation-value
+  font-weight: 600
+  color: #111827
+
+// Data row indentation for nested groups
+.data-row
+  // Indentation is handled inline via style binding
 
 // Smooth scrolling container
 .overflow-auto

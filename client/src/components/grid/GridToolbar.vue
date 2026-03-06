@@ -91,10 +91,12 @@
         v-if="groupableColumns.length > 0"
         flat
         icon="workspaces"
-        label="Group By"
+        :label="hasActiveGrouping ? `Group By (${grouping.length})` : 'Group By'"
         dropdown-icon="expand_more"
+        :color="hasActiveGrouping ? 'primary' : undefined"
       >
         <q-list>
+          <q-item-label header>Group By Columns</q-item-label>
           <q-item
             v-for="column in groupableColumns"
             :key="column.id"
@@ -109,6 +111,9 @@
             </q-item-section>
             <q-item-section>
               <q-item-label>{{ column.label }}</q-item-label>
+              <q-item-label caption v-if="isGroupedBy(column.id)">
+                Level {{ getGroupingLevel(column.id) + 1 }}
+              </q-item-label>
             </q-item-section>
           </q-item>
           
@@ -119,8 +124,11 @@
             clickable
             @click="clearGrouping"
           >
+            <q-item-section avatar>
+              <q-icon name="clear" color="negative" />
+            </q-item-section>
             <q-item-section>
-              <q-item-label class="tw-text-red-600">Clear Grouping</q-item-label>
+              <q-item-label class="tw-text-red-600">Clear All Grouping</q-item-label>
             </q-item-section>
           </q-item>
         </q-list>
@@ -264,6 +272,10 @@ const toggleGrouping = (columnId: string) => {
 
 const clearGrouping = () => {
   gridStore.setGrouping([])
+}
+
+const getGroupingLevel = (columnId: string): number => {
+  return grouping.value.indexOf(columnId)
 }
 </script>
 
