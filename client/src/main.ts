@@ -15,6 +15,7 @@ import './index.css'
 
 import App from './App.vue'
 import { queryClient } from './lib/queryClient'
+import { useCustomizationStore } from './stores/customization'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -27,5 +28,9 @@ app.use(Quasar, {
   }
 })
 app.use(VueQueryPlugin, { queryClient })
+
+// Initialize customization store
+const customizationStore = useCustomizationStore()
+customizationStore.initialize()
 
 app.mount('#app')

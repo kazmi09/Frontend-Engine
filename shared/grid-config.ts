@@ -108,6 +108,39 @@ export interface GridConfig {
       aggregation: 'sum' | 'avg' | 'min' | 'max' | 'count'
       label?: string
     }[]
+    /**
+     * Optional group-level styling and label customization.
+     * This is intentionally declarative (no functions) to keep configs serializable and dataset-agnostic.
+     */
+    groupStyles?: {
+      /**
+       * Zero-based grouping depth this style applies to (0 = top-level group).
+       * If omitted, applies to all levels unless a more specific entry overrides it.
+       */
+      level?: number
+      /**
+       * Extra CSS class to apply to the group header row (e.g. Tailwind utility class).
+       */
+      rowClass?: string
+      /**
+       * Extra CSS class to apply to the count badge in the group header.
+       */
+      badgeClass?: string
+    }[]
+    /**
+     * Optional label templates for group headers.
+     * Tokens: {columnLabel}, {value}, {count}, {displayName}, {displayNamePlural}
+     */
+    labelTemplates?: {
+      /**
+       * Column ID this template applies to. If omitted, used as a default template for all grouped columns.
+       */
+      field?: string
+      /**
+       * Template string, e.g. "{columnLabel}: {value} ({count} {displayNamePlural})"
+       */
+      template: string
+    }[]
   }
 }
 
@@ -202,6 +235,19 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
         { field: 'age', aggregation: 'avg', label: 'Avg Age' },
         { field: 'height', aggregation: 'avg', label: 'Avg Height' },
         { field: 'weight', aggregation: 'avg', label: 'Avg Weight' }
+      ],
+      // Example group-level customization for users grid
+      groupStyles: [
+        // Top-level groups: slightly stronger background
+        { level: 0, rowClass: 'group-level-0-custom', badgeClass: 'group-badge-level-0' },
+        // Second-level groups: lighter background
+        { level: 1, rowClass: 'group-level-1-custom' }
+      ],
+      // Default label template for all grouped columns
+      labelTemplates: [
+        {
+          template: '{columnLabel}: {value} ({count} {displayNamePlural})'
+        }
       ]
     }
   },
@@ -284,6 +330,15 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
         { field: 'price', aggregation: 'avg', label: 'Avg Price' },
         { field: 'stock', aggregation: 'sum', label: 'Total Stock' },
         { field: 'rating', aggregation: 'avg', label: 'Avg Rating' }
+      ],
+      // Example group-level customization for products grid
+      groupStyles: [
+        { level: 0, rowClass: 'group-level-0-custom', badgeClass: 'group-badge-level-0' }
+      ],
+      labelTemplates: [
+        {
+          template: '{columnLabel}: {value} ({count} {displayNamePlural})'
+        }
       ]
     }
   }

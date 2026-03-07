@@ -27,6 +27,34 @@ export interface GroupingConfig {
     label?: string
   }[]
   customGroupHeader?: (groupValue: any, field: string, count: number) => string
+  /**
+   * Optional group-level styling configuration, mirrored from shared/grid-config for client-side usage.
+   */
+  groupStyles?: {
+    /**
+     * Zero-based depth of the group row (0 = top-level group).
+     */
+    level?: number
+    /**
+     * Extra CSS class to apply to the group header row.
+     */
+    rowClass?: string
+    /**
+     * Extra CSS class to apply to the group count badge.
+     */
+    badgeClass?: string
+  }[]
+  /**
+   * Optional label templates for group headers.
+   * Tokens: {columnLabel}, {value}, {count}, {displayName}, {displayNamePlural}
+   */
+  labelTemplates?: {
+    /**
+     * Column ID this template applies to. If omitted, used as a default template.
+     */
+    field?: string
+    template: string
+  }[]
 }
 
 export interface ExpandableConfig {

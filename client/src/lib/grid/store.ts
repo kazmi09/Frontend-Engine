@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { GridState, FilterState, DetailPanelState } from './types'
 import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/vue-table"
+import { useCustomizationStore } from '@/stores/customization'
 
 const initialState: GridState = {
   columnVisibility: {},
@@ -243,6 +244,48 @@ export const useGridStore = defineStore('grid', () => {
     groupExpanded.value = {}
   }
   
+  // Group customization actions - delegate to customization store
+  const setGroupCustomization = (
+    dataset: string,
+    groupColumn: string,
+    groupValue: string,
+    customization: {
+      color?: string
+      label?: string
+      metadata?: string
+    }
+  ) => {
+    const customizationStore = useCustomizationStore()
+    customizationStore.saveCustomization(
+      { datasetId: dataset, columnName: groupColumn, groupValue },
+      customization
+    )
+  }
+  
+  // Reset group customization
+  const resetGroupCustomization = (
+    dataset: string,
+    groupColumn: string,
+    groupValue: string
+  ) => {
+    const customizationStore = useCustomizationStore()
+    customizationStore.deleteCustomization(
+      { datasetId: dataset, columnName: groupColumn, groupValue }
+    )
+  }
+  
+  // Get group customization
+  const getGroupCustomization = (
+    dataset: string,
+    groupColumn: string,
+    groupValue: string
+  ) => {
+    const customizationStore = useCustomizationStore()
+    return customizationStore.getCustomization(
+      { datasetId: dataset, columnName: groupColumn, groupValue }
+    )
+  }
+  
   return {
     // State
     columnVisibility,
@@ -301,5 +344,10 @@ export const useGridStore = defineStore('grid', () => {
     toggleGroupExpansion,
     expandAllGroups,
     collapseAllGroups,
+    
+    // Group customization actions
+    setGroupCustomization,
+    resetGroupCustomization,
+    getGroupCustomization,
   }
 })

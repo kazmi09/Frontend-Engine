@@ -189,11 +189,8 @@
                   v-if="grouping.length > 0 && row.getIsGrouped()"
                   :key="`group-${row.id}`"
                   class="group-header-row"
-                  :class="{
-                    'group-level-0': row.depth === 0,
-                    'group-level-1': row.depth === 1,
-                    'group-level-2': row.depth >= 2,
-                  }"
+                  :class="getGroupHeaderClasses(row)"
+                  :style="getGroupHeaderStyle(row)"
                   @click="row.toggleExpanded()"
                 >
                   <td 
@@ -214,8 +211,19 @@
                         <span class="group-label">
                           <template v-for="cell in row.getVisibleCells()" :key="cell.id">
                             <template v-if="cell.getIsGrouped()">
-                              <span class="group-column-name">{{ cell.column.columnDef.header }}:</span>
-                              <span class="group-value">{{ formatGroupValue(cell.getValue()) }}</span>
+                              {{ getGroupLabel(cell, row) }}
+                              <!-- Custom Label Badge if exists -->
+                              <q-chip
+                                v-if="getGroupCustomLabel(cell, row)"
+                                dense
+                                size="sm"
+                                color="primary"
+                                text-color="white"
+                                class="tw-ml-2"
+                                @click.stop
+                              >
+                                {{ getGroupCustomLabel(cell, row) }}
+                              </q-chip>
                             </template>
                           </template>
                         </span>
@@ -225,7 +233,24 @@
                           :label="formatGroupCount(getLeafRowCount(row))"
                           color="primary"
                           class="group-count-badge"
+                          :class="getGroupBadgeClass(row)"
                         />
+                      </div>
+                      
+                      <!-- Customization Menu -->
+                      <div class="group-customization-menu-wrapper" @click.stop>
+                        <template v-for="cell in row.getVisibleCells()" :key="cell.id">
+                          <GroupCustomizationMenu
+                            v-if="cell.getIsGrouped()"
+                            :dataset="gridId"
+                            :group-column="cell.column.id"
+                            :group-column-label="cell.column.columnDef.header ?? cell.column.id"
+                            :group-value="String(cell.getValue() ?? '')"
+                            :current-customization="getGroupCustomization(cell.column.id, cell.getValue())"
+                            @save="(customization) => handleSaveCustomization(cell.column.id, cell.getValue(), customization)"
+                            @reset="() => handleResetCustomization(cell.column.id, cell.getValue())"
+                          />
+                        </template>
                       </div>
                       
                       <!-- Aggregated Values -->
@@ -243,6 +268,18 @@
                         </div>
                       </div>
                     </div>
+                    
+                    <!-- Metadata / Notes Display -->
+                    <template v-for="cell in row.getVisibleCells()" :key="`metadata-${cell.id}`">
+                      <div
+                        v-if="cell.getIsGrouped() && getGroupCustomization(cell.column.id, cell.getValue())?.metadata"
+                        class="tw-mt-2 tw-text-xs tw-text-gray-600 dark:tw-text-gray-400 tw-italic"
+                        :style="{ paddingLeft: '2.5rem' }"
+                        @click.stop
+                      >
+                        {{ getGroupCustomization(cell.column.id, cell.getValue())?.metadata }}
+                      </div>
+                    </template>
                   </td>
                 </tr>
                 
@@ -423,12 +460,24 @@ import EditableCell from './cells/EditableCell.vue'
 import ExpanderCell from './cells/ExpanderCell.vue'
 import DetailPanel from './cells/DetailPanel.vue'
 import BulkActionsBar from './BulkActionsBar.vue'
+import GroupCustomizationMenu from './GroupCustomizationMenu.vue'
 
 const props = defineProps<{
   data: DataResult
   isLoading?: boolean
   hasNextPage?: boolean
   isFetchingNext?: boolean
+  /**
+   * Optional grouping configuration and metadata passed from the page-level grid config.
+   * Used for group-level customization such as background colors and labels.
+   */
+  groupingConfig?: import('@/lib/grid/types').GroupingConfig
+  /**
+   * Singular and plural display names for the current grid's entity,
+   * used for building human-friendly group labels (e.g. "5 users").
+   */
+  displayName?: string
+  displayNamePlural?: string
 }>()
 
 const emit = defineEmits<{
@@ -1371,10 +1420,100 @@ const formatGroupValue = (value: any): string => {
 
 // Helper function to format group count
 const formatGroupCount = (count: number): string => {
-  // Try to get display name from grouping config, fallback to generic terms
-  const displayName = 'user' // Could be enhanced to get from grid config
-  const displayNamePlural = 'users'
+  // Try to get display name from props, fallback to generic terms
+  const displayName = props.displayName || 'item'
+  const displayNamePlural = props.displayNamePlural || 'items'
   return `${count} ${count === 1 ? displayName : displayNamePlural}`
+}
+
+// Get group customization from store
+const getGroupCustomization = (groupColumn: string, groupValue: any) => {
+  const dataset = gridId.value
+  const valueStr = String(groupValue ?? '')
+  return gridStore.getGroupCustomization(dataset, groupColumn, valueStr)
+}
+
+// Compute extra CSS classes for a group header row based on depth and optional groupingConfig styles
+const getGroupHeaderClasses = (row: any): Record<string, boolean> | string[] => {
+  const classes: Record<string, boolean> = {
+    'group-level-0': row.depth === 0,
+    'group-level-1': row.depth === 1,
+    'group-level-2': row.depth >= 2,
+  }
+
+  const styles = props.groupingConfig?.groupStyles
+  if (styles && styles.length > 0) {
+    // Find the most specific style for this depth (exact match first, then entries without level)
+    const exact = styles.find(s => s.level === row.depth && !!s.rowClass)
+    const fallback = styles.find(s => s.level === undefined && !!s.rowClass)
+    const style = exact || fallback
+    if (style?.rowClass) {
+      classes[style.rowClass] = true
+    }
+  }
+
+  return classes
+}
+
+// Get inline style for group header (for custom background color)
+const getGroupHeaderStyle = (row: any): Record<string, string> | undefined => {
+  // Find the grouped cell to get customization
+  const groupedCell = row.getVisibleCells().find((cell: any) => cell.getIsGrouped())
+  if (!groupedCell) return undefined
+  
+  const customization = getGroupCustomization(groupedCell.column.id, groupedCell.getValue())
+  if (customization?.color) {
+    return {
+      backgroundColor: customization.color,
+    }
+  }
+  return undefined
+}
+
+// Compute extra CSS classes for a group count badge based on depth and optional groupingConfig styles
+const getGroupBadgeClass = (row: any): string | undefined => {
+  const styles = props.groupingConfig?.groupStyles
+  if (!styles || styles.length === 0) return undefined
+
+  const exact = styles.find(s => s.level === row.depth && !!s.badgeClass)
+  const fallback = styles.find(s => s.level === undefined && !!s.badgeClass)
+  return (exact || fallback)?.badgeClass
+}
+
+// Build a group label using optional labelTemplates from groupingConfig
+// Get custom label for a group (if user has customized it)
+const getGroupCustomLabel = (cell: any, row: any): string | null => {
+  const customization = getGroupCustomization(cell.column.id, cell.getValue())
+  return customization?.label || null
+}
+
+const getGroupLabel = (cell: any, row: any): string => {
+  const columnLabel = cell.column.columnDef.header ?? cell.column.id
+  const rawValue = cell.getValue()
+  const value = formatGroupValue(rawValue)
+  const count = getLeafRowCount(row)
+  const displayName = props.displayName || 'item'
+  const displayNamePlural = props.displayNamePlural || 'items'
+
+  const templates = props.groupingConfig?.labelTemplates
+  if (templates && templates.length > 0) {
+    const columnId = cell.column.id
+    const exact = templates.find(t => t.field === columnId)
+    const fallback = templates.find(t => t.field === undefined)
+    const template = exact?.template || fallback?.template
+
+    if (template) {
+      return template
+        .replace('{columnLabel}', String(columnLabel))
+        .replace('{value}', String(value))
+        .replace('{count}', String(count))
+        .replace('{displayName}', displayName)
+        .replace('{displayNamePlural}', displayNamePlural)
+    }
+  }
+
+  // Default label format
+  return `${columnLabel}: ${value}`
 }
 
 // Helper function to format aggregation value
@@ -1434,6 +1573,24 @@ const getLeafRowCount = (row: any): number => {
   }
   // If no subRows, it's a leaf row itself
   return 1
+}
+
+// Handle save customization
+const handleSaveCustomization = (
+  groupColumn: string,
+  groupValue: any,
+  customization: { color?: string; label?: string; metadata?: string }
+) => {
+  const dataset = gridId.value
+  const valueStr = String(groupValue ?? '')
+  gridStore.setGroupCustomization(dataset, groupColumn, valueStr, customization)
+}
+
+// Handle reset customization
+const handleResetCustomization = (groupColumn: string, groupValue: any) => {
+  const dataset = gridId.value
+  const valueStr = String(groupValue ?? '')
+  gridStore.resetGroupCustomization(dataset, groupColumn, valueStr)
 }
 </script>
 
@@ -1529,6 +1686,10 @@ table
   
   &:hover
     background-color: #e5e7eb
+    
+    .group-customization-menu-wrapper
+      .group-menu-btn
+        opacity: 1
   
   &.group-level-0
     background-color: #f3f4f6
@@ -1541,6 +1702,10 @@ table
   &.group-level-2
     background-color: #fafbfc
     font-weight: 500
+
+.group-customization-menu-wrapper
+  display: flex
+  align-items: center
 
 .group-header-cell
   padding: 0.875rem 1rem
