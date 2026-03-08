@@ -30,9 +30,11 @@
 
     <!-- Grid Toolbar -->
     <GridToolbar 
-      :columns="data?.columns"
+      :columns="permissionAwareData?.columns"
       :groupable-columns="data?.grouping?.enabled ? (data?.columns?.map(c => c.id) || []) : []"
+      :active-role="effectiveRole"
       @column-visibility-changed="handleColumnVisibilityChanged"
+      @role-changed="handleRoleChanged"
     />
 
     <!-- Main Content Area -->
@@ -76,14 +78,15 @@
       </div>
       
       <DataGrid 
-        v-else-if="data" 
-        :data="data" 
+        v-else-if="permissionAwareData" 
+        :data="permissionAwareData" 
         :is-loading="isLoading"
         :has-next-page="useInfiniteScrollMode ? (hasNextPage || false) : false"
         :is-fetching-next="useInfiniteScrollMode ? (isInfiniteFetching || false) : false"
         :grouping-config="(gridConfig as any)?.grouping"
         :display-name="displayName"
         :display-name-plural="displayNamePlural"
+        :active-role="effectiveRole"
         class="flex-1"
         @load-more="() => useInfiniteScrollMode && fetchNextPage()"
         @bulk-edit="handleBulkEdit"
@@ -105,6 +108,8 @@ import { createGridApi } from '@/lib/api/generic-grid'
 import { useGridStore } from '@/lib/grid/store'
 import { useGridStateStore } from '@/stores/gridState'
 import { DataResult } from '@/lib/grid/types'
+import { useAuthStore } from '@/lib/auth/store'
+import { resolveColumnPermissions } from '@/lib/grid/permissions'
 import DataGrid from '@/components/grid/DataGrid.vue'
 import GridToolbar from '@/components/grid/GridToolbar.vue'
 import GenericDetailPanel from '@/components/grid/GenericDetailPanel.vue'
@@ -113,6 +118,7 @@ const route = useRoute()
 const queryClient = useQueryClient()
 const gridStore = useGridStore()
 const gridStateStore = useGridStateStore()
+const authStore = useAuthStore()
 const $q = useQuasar()
 
 // Get gridId from route parameter
@@ -142,6 +148,12 @@ const gridApi = computed(() => createGridApi({
 
 // Use storeToRefs to make store properties reactive
 const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
+const { user } = storeToRefs(authStore)
+
+// Active role for permission testing / demos.
+// Defaults to the authenticated user role but can be overridden via the toolbar.
+const activeRole = ref<string | null>(user.value?.role ?? null)
+const effectiveRole = computed(() => activeRole.value || user.value?.role || null)
 
 // Determine if we should use infinite scroll (for large page sizes)
 const useInfiniteScrollMode = computed(() => pageSize.value >= 1000)
@@ -213,6 +225,27 @@ const data = computed(() => useInfiniteScrollMode.value ? combinedInfiniteData.v
 const isLoading = computed(() => useInfiniteScrollMode.value ? isInfiniteLoading.value : isRegularLoading.value)
 const isRefetching = computed(() => useInfiniteScrollMode.value ? isInfiniteFetching.value : isRegularRefetching.value)
 const error = computed(() => useInfiniteScrollMode.value ? infiniteError.value : regularError.value)
+
+// Apply config-driven, role-based column permissions on the client.
+// This keeps the grid engine completely data-agnostic: it only consumes
+// declarative permissions from the configuration and the current (or test) role.
+const permissionAwareData = computed<DataResult | undefined>(() => {
+  if (!data.value) return undefined
+
+  const role = effectiveRole.value
+  const columns = data.value.columns || []
+
+  const resolvedColumns = resolveColumnPermissions(columns, role)
+
+  return {
+    ...data.value,
+    columns: resolvedColumns,
+  }
+})
+
+const handleRoleChanged = (role: string) => {
+  activeRole.value = role
+}
 
 const refetch = () => {
   if (useInfiniteScrollMode.value) {

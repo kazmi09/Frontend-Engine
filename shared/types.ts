@@ -8,7 +8,28 @@ export interface ColumnConfig {
   pinned?: 'left' | 'right'
   editable?: boolean
   options?: string[] // For select type
+  /**
+   * Legacy, coarse-grained permission flag.
+   * If set, the column is only visible/editable for these roles.
+   * Prefer the more explicit `permissions` object below.
+   */
   requiredPermissions?: string[] // Permissions needed to view/edit this column
+  /**
+   * Fine-grained, data-agnostic column permissions.
+   * Completely config-driven – the grid engine never hardcodes any roles.
+   */
+  permissions?: {
+    /**
+     * Roles that are allowed to SEE this column.
+     * If omitted, the column is visible to all roles.
+     */
+    view?: string[]
+    /**
+     * Roles that are allowed to EDIT this column.
+     * If omitted, editability falls back to the base `editable` flag.
+     */
+    edit?: string[]
+  }
 }
 
 export interface ExpandableConfig {

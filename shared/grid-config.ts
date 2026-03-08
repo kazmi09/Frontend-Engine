@@ -8,7 +8,28 @@ export interface ColumnConfig {
   pinned?: 'left' | 'right'
   editable?: boolean
   options?: string[] // For select type
+  /**
+   * Legacy, coarse-grained permission flag.
+   * If set, the column is only visible/editable for these roles.
+   * Prefer the more explicit `permissions` object below.
+   */
   requiredPermissions?: string[] // Permissions needed to view/edit this column
+  /**
+   * Fine-grained, data-agnostic column permissions.
+   * Completely config-driven – the grid engine never hardcodes any roles.
+   */
+  permissions?: {
+    /**
+     * Roles that are allowed to SEE this column.
+     * If omitted, the column is visible to all roles.
+     */
+    view?: string[]
+    /**
+     * Roles that are allowed to EDIT this column.
+     * If omitted, editability falls back to the base `editable` flag.
+     */
+    edit?: string[]
+  }
 }
 
 export interface GridDataSource {
@@ -172,20 +193,150 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     },
     columns: [
       { id: "id", label: "ID", type: "number", width: 80, pinned: "left", editable: false },
-      { id: "firstName", label: "First Name", type: "string", width: 150, editable: true },
-      { id: "lastName", label: "Last Name", type: "string", width: 150, editable: true },
-      { id: "email", label: "Email", type: "string", width: 250, editable: true },
-      { id: "phone", label: "Phone", type: "string", width: 180, editable: true },
-      { id: "username", label: "Username", type: "string", width: 120, editable: true },
-      { id: "age", label: "Age", type: "number", width: 80, editable: true },
-      { id: "gender", label: "Gender", type: "select", options: ["male", "female"], width: 100, editable: true },
-      { id: "birthDate", label: "Birth Date", type: "date", width: 120, editable: true },
-      { id: "bloodGroup", label: "Blood Group", type: "string", width: 120, editable: true },
-      { id: "height", label: "Height", type: "number", width: 100, editable: true },
-      { id: "weight", label: "Weight", type: "number", width: 100, editable: true },
-      { id: "eyeColor", label: "Eye Color", type: "string", width: 120, editable: true },
-      { id: "university", label: "University", type: "string", width: 200, editable: true },
-      { id: "role", label: "Role", type: "select", options: ["admin", "moderator", "user"], width: 120, editable: true }
+      {
+        id: "firstName",
+        label: "First Name",
+        type: "string",
+        width: 150,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin", "moderator"],
+        },
+      },
+      {
+        id: "lastName",
+        label: "Last Name",
+        type: "string",
+        width: 150,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin", "moderator"],
+        },
+      },
+      {
+        id: "email",
+        label: "Email",
+        type: "string",
+        width: 250,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "phone",
+        label: "Phone",
+        type: "string",
+        width: 180,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin", "moderator"],
+        },
+      },
+      {
+        id: "username",
+        label: "Username",
+        type: "string",
+        width: 120,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin", "moderator"],
+        },
+      },
+      {
+        id: "age",
+        label: "Age",
+        type: "number",
+        width: 80,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "gender",
+        label: "Gender",
+        type: "select",
+        options: ["male", "female"],
+        width: 100,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "birthDate",
+        label: "Birth Date",
+        type: "date",
+        width: 120,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "bloodGroup",
+        label: "Blood Group",
+        type: "string",
+        width: 120,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "height",
+        label: "Height",
+        type: "number",
+        width: 100,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "weight",
+        label: "Weight",
+        type: "number",
+        width: 100,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "eyeColor",
+        label: "Eye Color",
+        type: "string",
+        width: 120,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin"],
+        },
+      },
+      {
+        id: "university",
+        label: "University",
+        type: "string",
+        width: 200,
+        editable: true,
+        permissions: {
+          view: ["admin", "moderator", "viewer"],
+          edit: ["admin", "moderator"],
+        },
+      },
     ],
     expandable: {
       enabled: true,
@@ -222,7 +373,7 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     },
     filters: {
       enabled: true,
-      filterableColumns: ['gender', 'role', 'bloodGroup', 'eyeColor']
+      filterableColumns: ['gender', 'bloodGroup', 'eyeColor']
     },
     grouping: {
       enabled: true,

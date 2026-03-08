@@ -324,6 +324,7 @@
                       :column="getColumnConfig(cell.column.id)"
                       :width="cell.column.getSize()"
                       :grid-id="gridId"
+                      :active-role="props.activeRole"
                     />
                   </td>
                 </tr>
@@ -478,6 +479,12 @@ const props = defineProps<{
    */
   displayName?: string
   displayNamePlural?: string
+  /**
+   * Effective role used for permission evaluation in this grid instance.
+   * When provided, this overrides the authenticated user role for column-level
+   * view/edit behaviour, which is useful for testing and demos.
+   */
+  activeRole?: string | null
 }>()
 
 const emit = defineEmits<{

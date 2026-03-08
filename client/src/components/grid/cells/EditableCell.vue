@@ -89,6 +89,12 @@ const props = defineProps<{
   column: ColumnConfig
   width: number
   gridId: string
+  /**
+   * Optional override for the current role used in permission checks.
+   * When provided, this takes precedence over the authenticated user role,
+   * allowing the toolbar role switcher to drive view/edit behaviour.
+   */
+  activeRole?: string | null
 }>()
 
 const editValue = ref(props.value)
@@ -108,15 +114,51 @@ watch(() => props.value, (newValue) => {
   editValue.value = newValue
 })
 
-// Permissions
-const hasPermission = computed(() => 
-  !props.column.requiredPermissions || 
-  props.column.requiredPermissions.includes(authStore.user.role)
-)
+// Permissions (view + edit) are fully config-driven via ColumnConfig.
+// We intentionally avoid hard-coding any role names here.
+// If an activeRole override is provided (from the toolbar), it takes precedence.
+const currentRole = computed(() => props.activeRole ?? authStore.user.role)
 
-const isEditable = computed(() => 
-  props.column.editable && hasPermission.value
-)
+// Whether the current user is allowed to see this column's value
+const hasViewPermission = computed(() => {
+  const perms = props.column.permissions
+
+  // Fine-grained config takes precedence
+  if (perms?.view && perms.view.length > 0) {
+    return perms.view.includes(currentRole.value)
+  }
+
+  // Backwards-compatible: legacy requiredPermissions
+  if (props.column.requiredPermissions && props.column.requiredPermissions.length > 0) {
+    return props.column.requiredPermissions.includes(currentRole.value)
+  }
+
+  // No restriction configured → visible to all roles
+  return true
+})
+
+// Whether the current user is allowed to edit this column
+const hasEditPermission = computed(() => {
+  const perms = props.column.permissions
+  const baseEditable = props.column.editable !== false
+
+  if (!baseEditable) return false
+
+  if (perms?.edit && perms.edit.length > 0) {
+    return perms.edit.includes(currentRole.value)
+  }
+
+  // Legacy behaviour: if requiredPermissions is present and we passed the view
+  // check above, gate editing by the same list.
+  if (props.column.requiredPermissions && props.column.requiredPermissions.length > 0) {
+    return props.column.requiredPermissions.includes(currentRole.value)
+  }
+
+  // No edit restriction configured beyond the base flag
+  return baseEditable
+})
+
+const isEditable = computed(() => hasViewPermission.value && hasEditPermission.value)
 
 // Display value formatting
 const displayValue = computed(() => {

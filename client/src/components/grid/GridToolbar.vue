@@ -142,6 +142,22 @@
       >
         <q-tooltip>Export Data</q-tooltip>
       </q-btn>
+
+      <!-- Role switcher for permission testing -->
+      <q-select
+        v-model="selectedRole"
+        :options="roleOptions"
+        outlined
+        dense
+        emit-value
+        map-options
+        label="Role"
+        style="min-width: 140px"
+      >
+        <template v-slot:prepend>
+          <q-icon name="person_outline" />
+        </template>
+      </q-select>
     </div>
   </div>
 </template>
@@ -156,10 +172,17 @@ import { useQuasar } from 'quasar'
 const props = defineProps<{
   columns?: ColumnConfig[]
   groupableColumns?: string[] // List of column IDs that can be grouped
+  /**
+   * Currently active role used for permission testing.
+   * When undefined, the toolbar will default to "admin" for the dropdown label only;
+   * it does not mutate the underlying auth user.
+   */
+  activeRole?: string | null
 }>()
 
 const emit = defineEmits<{
   columnVisibilityChanged: [visibility: Record<string, boolean>]
+  roleChanged: [role: string]
 }>()
 
 const gridStore = useGridStore()
@@ -175,6 +198,22 @@ const {
   hasSearch,
   grouping
 } = storeToRefs(gridStore)
+
+// Fixed demo/testing roles. These are generic, not dataset-specific,
+// and simply drive the client-side permission resolver.
+const roleOptions = [
+  { label: 'Admin', value: 'admin' },
+  { label: 'Moderator', value: 'moderator' },
+  { label: 'Viewer', value: 'viewer' }
+]
+
+// Two-way binding helper for the role dropdown
+const selectedRole = computed({
+  get: () => props.activeRole ?? 'admin',
+  set: (value: string) => {
+    emit('roleChanged', value)
+  }
+})
 
 // Available columns for filtering
 const filterOptions = computed(() => {
