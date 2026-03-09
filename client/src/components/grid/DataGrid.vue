@@ -395,7 +395,10 @@
     </div>
 
     <!-- Pagination -->
-    <div class="bg-white dark:bg-neutral-900 border-t px-6 py-3 flex items-center justify-between flex-none">
+    <div 
+      class="bg-white dark:bg-neutral-900 border-t px-6 py-3 flex items-center justify-between flex-none"
+      :style="{ marginBottom: selectedCount > 0 ? '80px' : '0' }"
+    >
       <div class="flex items-center gap-4">
         <span class="text-sm text-gray-600">
           Showing {{ startRow }} to {{ endRow }} of {{ totalRows }} entries
@@ -430,10 +433,14 @@
     <!-- Bulk Actions Bar -->
     <BulkActionsBar
       :columns="props.data?.columns || []"
+      :bulk-actions-config="props.bulkActionsConfig"
+      :display-name="props.displayName || 'item'"
+      :display-name-plural="props.displayNamePlural || 'items'"
       @bulk-edit="handleBulkEdit"
       @bulk-archive="handleBulkArchive"
       @bulk-delete="handleBulkDelete"
       @export="handleExport"
+      @custom-action="handleCustomAction"
     />
   </div>
 </template>
@@ -1021,6 +1028,11 @@ const currentPage = computed({
 
 const totalRows = computed(() => props.data?.pagination?.totalRows || 0)
 const totalPages = computed(() => Math.ceil(totalRows.value / pageSize.value))
+
+// Selected rows count for bulk actions bar spacing
+const selectedCount = computed(() => {
+  return Object.keys(rowSelection.value).filter(id => rowSelection.value[id]).length
+})
 
 // For infinite scroll mode: show actual loaded rows
 const loadedRows = computed(() => props.data?.rows?.length || 0)
