@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white dark:bg-neutral-900 border-b px-6 py-3 flex items-center justify-between gap-4 flex-none">
+  <div class="bg-white dark:bg-neutral-900 border-b px-6 py-3 flex items-center justify-between gap-4 flex-wrap flex-none">
     <!-- Left side: Search and Filter -->
     <div class="flex items-center gap-4 flex-1">
       <!-- Search Input -->

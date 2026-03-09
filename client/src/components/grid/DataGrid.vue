@@ -27,7 +27,7 @@
     <div 
       ref="tableContainerRef" 
       class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white relative"
-      style="overflow-y: auto; overflow-x: auto;"
+      style="overflow-y: auto; overflow-x: auto; width: 100%;"
     >
       <!-- Enhanced Skeleton Loading with Quasar Components -->
       <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="w-full">
@@ -85,7 +85,7 @@
       </div>
       
       <!-- Data Table -->
-      <table v-else class="w-full border-collapse" :key="tableKey">
+      <table v-else class="border-collapse min-w-full" :key="tableKey">
         <!-- Header -->
         <thead class="bg-gray-50 sticky top-0 z-10">
           <tr v-for="headerGroup in (table?.getHeaderGroups?.() || [])" :key="headerGroup.id">
@@ -1660,10 +1660,13 @@ th[draggable="true"]
   // Use CSS containment for better performance
   contain: layout style paint
 
-// Table performance optimizations
+// Table layout & performance
 table
-  // Prevent layout shifts during scroll
-  table-layout: fixed
+  // Let intrinsic column widths determine total table width so the grid
+  // can overflow horizontally and be scrolled when there are many columns.
+  table-layout: auto
+  width: max-content
+  min-width: 100%
   
   tbody tr
     // Fixed row height prevents shaking
