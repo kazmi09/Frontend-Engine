@@ -1,5 +1,5 @@
 <template>
-  <q-layout view="lHh Lpr lFf">
+  <q-layout view="lHh Lpr lFf" class="layout-root">
     <q-header elevated>
       <q-toolbar>
         <q-toolbar-title>
@@ -26,8 +26,8 @@
       </q-toolbar>
     </q-header>
 
-    <q-page-container>
-      <q-page class="flex column">
+    <q-page-container class="page-container-fill">
+      <q-page class="page-fill">
         <router-view />
       </q-page>
     </q-page-container>
@@ -39,6 +39,27 @@
 </script>
 
 <style lang="sass">
+html, body
+  height: 100%
+  overflow: hidden
+
+.layout-root
+  height: 100vh
+  overflow: hidden
+
+.page-container-fill
+  display: flex
+  flex-direction: column
+  height: 100%
+
 .q-page
-  min-height: 100vh
+  min-height: unset !important
+  flex: 1
+  display: flex
+  flex-direction: column
+  overflow: hidden
+
+.page-fill
+  flex: 1
+  overflow: hidden
 </style>

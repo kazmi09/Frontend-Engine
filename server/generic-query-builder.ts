@@ -197,9 +197,25 @@ export class GenericQueryBuilder {
       totalRows = allData.length
     }
 
+    // Multiply dataset for testing (gives enough rows to demo infinite scroll)
+    const MULTIPLIER = 5
+    const baseData = [...allData]
+    for (let i = 1; i < MULTIPLIER; i++) {
+      allData = allData.concat(baseData.map((item: any) => ({
+        ...item,
+        id: item.id + (i * 10000) // Ensure unique IDs across copies
+      })))
+    }
+    totalRows = allData.length
+
     // Client-side pagination (if we fetched all data for search)
     let paginatedData = allData
     if (searchText || !responseData.users) {
+      const startIndex = pageIndex * pageSize
+      const endIndex = startIndex + pageSize
+      paginatedData = allData.slice(startIndex, endIndex)
+    } else {
+      // For normal paginated requests, slice from the multiplied set
       const startIndex = pageIndex * pageSize
       const endIndex = startIndex + pageSize
       paginatedData = allData.slice(startIndex, endIndex)

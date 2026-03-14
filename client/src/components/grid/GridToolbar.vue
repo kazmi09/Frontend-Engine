@@ -1,15 +1,16 @@
 <template>
-  <div class="bg-white dark:bg-neutral-900 border-b px-6 py-3 flex items-center justify-between gap-4 flex-wrap flex-none">
+  <div class="bg-white dark:bg-neutral-900 border-b px-4 py-2 flex items-center justify-between gap-3 flex-none min-h-[52px]">
     <!-- Left side: Search and Filter -->
-    <div class="flex items-center gap-4 flex-1">
+    <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
       <!-- Search Input -->
       <q-input
-        v-model="searchText"
+        :model-value="searchText"
         outlined
         dense
         placeholder="Search..."
-        style="min-width: 300px"
+        class="min-w-[200px] max-w-xs flex-1"
         clearable
+        @update:model-value="(val) => gridStore.setSearchText(val != null ? String(val) : '')"
         @clear="clearSearch"
       >
         <template v-slot:prepend>
@@ -19,15 +20,16 @@
 
       <!-- Filter By Select -->
       <q-select
-        v-model="filterBy"
+        :model-value="filterBy"
         :options="filterOptions"
         outlined
         dense
         emit-value
         map-options
         placeholder="Filter by column"
-        style="min-width: 180px"
+        class="min-w-[160px] max-w-[200px]"
         clearable
+        @update:model-value="(val) => gridStore.setFilterBy(val ?? '')"
         @clear="clearFilter"
       >
         <template v-slot:prepend>
@@ -49,7 +51,7 @@
     </div>
 
     <!-- Right side: Actions -->
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1 flex-none flex-wrap justify-end">
       <!-- Column Visibility -->
       <q-btn-dropdown
         flat
@@ -152,7 +154,7 @@
         emit-value
         map-options
         label="Role"
-        style="min-width: 140px"
+        class="min-w-[120px]"
       >
         <template v-slot:prepend>
           <q-icon name="person_outline" />
@@ -271,10 +273,12 @@ const toggleColumnVisibility = (columnId: string) => {
 // Actions
 const clearSearch = () => {
   gridStore.setSearchText('')
+  gridStore.setFilterBy('')
 }
 
 const clearFilter = () => {
   gridStore.setFilterBy('')
+  gridStore.setSearchText('')
 }
 
 const exportData = () => {

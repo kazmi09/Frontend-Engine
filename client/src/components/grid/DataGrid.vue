@@ -1,18 +1,5 @@
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <!-- Scroll Position Indicator - Always Visible for Testing -->
-    <div 
-      v-if="visibleRowRange.first && visibleRowRange.last"
-      class="fixed top-20 right-8 z-50 bg-primary text-white px-4 py-2 rounded-lg shadow-lg"
-    >
-      <div class="text-xs font-medium">
-        Viewing Rows: {{ visibleRowRange.first }} - {{ visibleRowRange.last }}
-      </div>
-      <div class="text-xs opacity-80 mt-1">
-        {{ visibleRowRange.count }} of {{ totalRows }} total
-      </div>
-    </div>
-
     <!-- Debug Info -->
     <div v-if="false" class="p-2 bg-gray-100 text-xs">
       <div>Data rows: {{ props.data?.rows?.length || 0 }}</div>
@@ -26,8 +13,7 @@
     <!-- Table Container -->
     <div 
       ref="tableContainerRef" 
-      class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white relative"
-      style="overflow-y: auto; overflow-x: auto; width: 100%;"
+      class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white relative mx-2 mb-2"
     >
       <!-- Enhanced Skeleton Loading with Quasar Components -->
       <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="w-full">
@@ -85,7 +71,7 @@
       </div>
       
       <!-- Data Table -->
-      <table v-else class="border-collapse min-w-full" :key="tableKey">
+      <table v-else class="border-collapse" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }" :key="tableKey">
         <!-- Header -->
         <thead class="bg-gray-50 sticky top-0 z-10">
           <tr v-for="headerGroup in (table?.getHeaderGroups?.() || [])" :key="headerGroup.id">
@@ -359,7 +345,7 @@
       </table>
 
       <!-- Loading More Skeleton (Infinite Scroll) -->
-      <div v-if="isFetchingNext" class="w-full">
+      <div v-if="isFetchingNext" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }">
         <q-markup-table flat bordered class="skeleton-table">
           <tbody>
             <tr v-for="i in 5" :key="`loading-${i}`">
@@ -394,40 +380,10 @@
       </div>
     </div>
 
-    <!-- Pagination -->
-    <div 
-      class="bg-white dark:bg-neutral-900 border-t px-6 py-3 flex items-center justify-between flex-none"
-      :style="{ marginBottom: selectedCount > 0 ? '80px' : '0' }"
-    >
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-600">
-          Showing {{ startRow }} to {{ endRow }} of {{ totalRows }} entries
-        </span>
-        
-        <q-select
-          v-model="pageSize"
-          :options="pageSizeOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          style="min-width: 100px"
-          @update:model-value="gridStore.setPageSize"
-        >
-          <template v-slot:prepend>
-            <span class="text-sm">Show:</span>
-          </template>
-        </q-select>
-      </div>
-
-      <q-pagination
-        v-model="currentVirtualPage"
-        :max="totalPages"
-        :max-pages="7"
-        direction-links
-        boundary-links
-        @update:model-value="handlePageChange"
-      />
+    <!-- Status Bar -->
+    <div class="flex-none bg-white dark:bg-neutral-900 border-t px-4 py-1.5 flex items-center justify-between text-xs text-gray-500">
+      <span>{{ totalRows.toLocaleString() }} total rows{{ props.isFetchingNext ? ' · Loading more...' : (props.hasNextPage ? ' · Scroll to load more' : '') }}</span>
+      <span v-if="selectedCount > 0" class="text-primary font-medium">{{ selectedCount }} selected</span>
     </div>
 
     <!-- Bulk Actions Bar -->
@@ -943,6 +899,12 @@ watch(() => props.data?.rows, () => {
 // Force table re-render when state changes
 const tableKey = computed(() => {
   return `${JSON.stringify(columnVisibility.value)}-${JSON.stringify(sorting.value)}`
+})
+
+// Total pixel width of all visible columns — drives explicit table width so
+// the container scrolls horizontally instead of squashing columns.
+const tableWidth = computed(() => {
+  return table.getVisibleLeafColumns().reduce((sum, col) => sum + col.getSize(), 0)
 })
 
 // Initialize grid state and composables

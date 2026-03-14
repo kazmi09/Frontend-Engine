@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen w-full flex flex-col bg-slate-50 dark:bg-neutral-950 overflow-hidden">
+  <div class="h-full w-full flex flex-col bg-slate-50 dark:bg-neutral-950 overflow-hidden">
     <!-- Top Navigation -->
     <header class="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
       <div class="flex items-center gap-4">
@@ -81,14 +81,14 @@
         v-else-if="permissionAwareData" 
         :data="permissionAwareData" 
         :is-loading="isLoading"
-        :has-next-page="useInfiniteScrollMode ? (hasNextPage || false) : false"
-        :is-fetching-next="useInfiniteScrollMode ? (isInfiniteFetching || false) : false"
+        :has-next-page="hasNextPage || false"
+        :is-fetching-next="isRefetching || false"
         :grouping-config="(gridConfig as any)?.grouping"
         :display-name="displayName"
         :display-name-plural="displayNamePlural"
         :active-role="effectiveRole"
         class="flex-1"
-        @load-more="() => useInfiniteScrollMode && fetchNextPage()"
+        @load-more="() => fetchNextPage()"
         @bulk-edit="handleBulkEdit"
         @bulk-archive="handleBulkArchive"
         @bulk-delete="handleBulkDelete"
@@ -99,10 +99,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/vue-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useQuasar } from 'quasar'
 import { createGridApi } from '@/lib/api/generic-grid'
 import { useGridStore } from '@/lib/grid/store'
@@ -147,7 +147,7 @@ const gridApi = computed(() => createGridApi({
 }))
 
 // Use storeToRefs to make store properties reactive
-const { pageIndex, pageSize, searchText, filterBy } = storeToRefs(gridStore)
+const { searchText, filterBy } = storeToRefs(gridStore)
 const { user } = storeToRefs(authStore)
 
 // Active role for permission testing / demos.
@@ -155,76 +155,47 @@ const { user } = storeToRefs(authStore)
 const activeRole = ref<string | null>(user.value?.role ?? null)
 const effectiveRole = computed(() => activeRole.value || user.value?.role || null)
 
-// Determine if we should use infinite scroll (for large page sizes)
-const useInfiniteScrollMode = computed(() => pageSize.value >= 1000)
 const CHUNK_SIZE = 100 // Load 100 rows at a time
 
-// Regular query for normal page sizes
-const { 
-  data: regularData, 
-  isLoading: isRegularLoading, 
-  isRefetching: isRegularRefetching, 
-  refetch: refetchRegular, 
-  error: regularError 
-} = useQuery<DataResult, Error>({
-  queryKey: computed(() => {
-    return [`${gridId.value}_regular`, pageIndex.value, pageSize.value, searchText.value, filterBy.value]
-  }),
-  queryFn: () => {
-    return gridApi.value.getAll(pageIndex.value, pageSize.value, searchText.value, filterBy.value)
-  },
-  enabled: computed(() => !useInfiniteScrollMode.value),
-  staleTime: 60_000,
-})
-
-// Infinite query for large page sizes
+// Infinite scroll is the only data-fetching path
 const {
   data: infiniteData,
-  isLoading: isInfiniteLoading,
-  isFetching: isInfiniteFetching,
+  isLoading,
+  isFetching: isRefetching,
   fetchNextPage,
   hasNextPage,
-  refetch: refetchInfinite,
-  error: infiniteError
-} = useInfiniteQuery({
-  queryKey: computed(() => {
-    return [`${gridId.value}_infinite`, searchText.value, filterBy.value]
-  }),
-  queryFn: async ({ pageParam = 0 }) => {
-    return gridApi.value.getAll(pageParam, CHUNK_SIZE, searchText.value, filterBy.value)
+  refetch,
+  error
+} = useInfiniteQuery<DataResult, Error>({
+  queryKey: computed(() => [`${gridId.value}_infinite`, searchText.value, filterBy.value]),
+  queryFn: async ({ pageParam }) => {
+    return gridApi.value.getAll(pageParam as number, CHUNK_SIZE, searchText.value, filterBy.value) as Promise<DataResult>
   },
-  getNextPageParam: (lastPage, allPages) => {
+  initialPageParam: 0,
+  getNextPageParam: (lastPage: DataResult, allPages: DataResult[]) => {
     const loadedRows = allPages.reduce((sum, page) => sum + page.rows.length, 0)
     const totalRows = lastPage.pagination?.totalRows || 0
     return loadedRows < totalRows ? allPages.length : undefined
   },
-  enabled: computed(() => useInfiniteScrollMode.value),
-  staleTime: 60_000,
+  staleTime: 0,
+  gcTime: 0,
 })
 
-// Combine data from infinite query pages
-const combinedInfiniteData = computed<DataResult | undefined>(() => {
+// Combine data from all loaded pages
+const data = computed<DataResult | undefined>(() => {
   if (!infiniteData.value?.pages) return undefined
-  
-  const pages = infiniteData.value.pages
+  const pages = infiniteData.value.pages as DataResult[]
   const firstPage = pages[0]
-  
   return {
     ...firstPage,
-    rows: pages.flatMap(page => page.rows),
+    rows: pages.flatMap((page) => page.rows),
     pagination: {
       ...firstPage.pagination,
       pageSize: pages.reduce((sum, page) => sum + page.rows.length, 0),
       pageIndex: 0
     }
-  }
+  } as DataResult
 })
-
-// Unified data, loading, and error states
-const data = computed(() => useInfiniteScrollMode.value ? combinedInfiniteData.value : regularData.value)
-const isLoading = computed(() => useInfiniteScrollMode.value ? isInfiniteLoading.value : isRegularLoading.value)
-const isRefetching = computed(() => useInfiniteScrollMode.value ? isInfiniteFetching.value : isRegularRefetching.value)
-const error = computed(() => useInfiniteScrollMode.value ? infiniteError.value : regularError.value)
 
 // Apply config-driven, role-based column permissions on the client.
 // This keeps the grid engine completely data-agnostic: it only consumes
@@ -246,23 +217,6 @@ const permissionAwareData = computed<DataResult | undefined>(() => {
 const handleRoleChanged = (role: string) => {
   activeRole.value = role
 }
-
-const refetch = () => {
-  if (useInfiniteScrollMode.value) {
-    refetchInfinite()
-  } else {
-    refetchRegular()
-  }
-}
-
-// Invalidate cache when pagination, search, or filter changes
-watch([pageIndex, pageSize, searchText, filterBy], () => {
-  if (useInfiniteScrollMode.value) {
-    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_infinite`] })
-  } else {
-    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_regular`] })
-  }
-})
 
 // Column visibility handler
 const handleColumnVisibilityChanged = (visibility: Record<string, boolean>) => {

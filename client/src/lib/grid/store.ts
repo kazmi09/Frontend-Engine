@@ -118,13 +118,13 @@ export const useGridStore = defineStore('grid', () => {
   }
   
   const setSearchText = (text: string) => {
-    searchText.value = text
+    searchText.value = text ?? ''
     pageIndex.value = 0 // Reset to first page when searching
   }
   
   const setFilterBy = (field: string) => {
-    filterBy.value = field
-    pageIndex.value = 0 // Reset to first page when filtering
+    filterBy.value = field ?? ''
+    pageIndex.value = 0
   }
   
   const setFilter = (columnId: string, filter: FilterState[string] | null) => {
