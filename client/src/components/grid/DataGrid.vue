@@ -316,7 +316,7 @@
                 </tr>
                 
                 <!-- Detail Panel Row -->
-                <tr v-if="!(grouping.length > 0 && row.getIsGrouped) && row.getIsExpanded?.()" :key="`${row.id}-detail`">
+                <tr v-if="!(grouping.length > 0 && row.getIsGrouped?.()) && row.getIsExpanded?.()" :key="`${row.id}-detail`">
                   <td :colspan="row.getVisibleCells().length" class="tw:p-0">
                     <DetailPanel
                       :row="row.original"
@@ -764,7 +764,7 @@ const rowVirtualizer = useVirtualizer({
   },
   getScrollElement: () => tableContainerRef.value || null,
   estimateSize: () => 53, // Estimated row height in pixels
-  overscan: 10, // Increased overscan to prevent shaking during fast scroll
+  overscan: 25, // Significantly increased overscan to prevent shaking during fast scroll
   measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('Firefox') === -1
     ? (element) => element?.getBoundingClientRect().height
     : undefined,
@@ -844,10 +844,10 @@ onMounted(() => {
             const scrollTop = container.scrollTop
             const scrollHeight = container.scrollHeight
             const clientHeight = container.clientHeight
-            const scrollPercentage = (scrollTop + clientHeight) / scrollHeight
+            const distanceToBottom = scrollHeight - scrollTop - clientHeight
             
-            // Load more when 80% scrolled
-            if (scrollPercentage >= 0.8) {
+            // Load more when within 1000 pixels of the bottom instead of percentage
+            if (distanceToBottom < 1000) {
               console.log('[DataGrid] Loading more data...')
               emit('loadMore')
             }
@@ -1197,7 +1197,10 @@ const handleToggleExpansion = (rowId: string) => {
   
   // Find the row in TanStack Table
   const tableRows = table.getRowModel().rows
-  const targetRow = tableRows.find(r => r.original.id === rowId)
+  // CRITICAL FIX: Exclude group rows from the search. TanStack Table assigns the original data
+  // of the first child leaf to the synthetic group row header. Otherwise, clicking the first child
+  // would find the group header row and collapse it instead of opening the child's detail panel!
+  const targetRow = tableRows.find(r => r.original?.id === rowId && !r.getIsGrouped?.())
   
   if (targetRow) {
     console.log('Found row in TanStack Table, current expanded state:', targetRow.getIsExpanded?.())
@@ -1354,7 +1357,9 @@ onMounted(() => {
 watch(() => props.data?.rows, (newRows) => {
   if (newRows) {
     const validRowIds = newRows.map(r => r.id)
-    gridStore.cleanupExpandedRows(validRowIds)
+    // Add group IDs (which typically contain ':') so they aren't accidentally wiped out
+    const validAndGroupIds = [...validRowIds, ...Object.keys(expandedRows.value).filter(id => id.includes(':'))]
+    gridStore.cleanupExpandedRows(validAndGroupIds)
   }
 }, { deep: true })
 
@@ -1362,7 +1367,8 @@ watch(() => props.data?.rows, (newRows) => {
 watch(pageIndex, () => {
   if (props.data?.rows) {
     const validRowIds = props.data.rows.map(r => r.id)
-    gridStore.cleanupExpandedRows(validRowIds)
+    const validAndGroupIds = [...validRowIds, ...Object.keys(expandedRows.value).filter(id => id.includes(':'))]
+    gridStore.cleanupExpandedRows(validAndGroupIds)
   }
 })
 

@@ -181,7 +181,14 @@ export const useGridStore = defineStore('grid', () => {
   }
   
   const collapseAllRows = () => {
-    expandedRows.value = {}
+    // Preserve group expansions (which use colons in their IDs like 'Gender:female')
+    const newExpandedRows: Record<string, boolean> = {}
+    Object.keys(expandedRows.value).forEach(id => {
+      if (id.includes(':')) {
+        newExpandedRows[id] = true
+      }
+    })
+    expandedRows.value = newExpandedRows
   }
   
   const setDetailPanelData = (rowId: string, data: any) => {
