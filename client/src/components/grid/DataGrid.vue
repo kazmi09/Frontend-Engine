@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
     <!-- Debug Info -->
-    <div v-if="false" class="p-2 bg-gray-100 text-xs">
+    <div v-if="false" class="tw:p-2 tw:bg-gray-100 tw:text-xs">
       <div>Data rows: {{ props.data?.rows?.length || 0 }}</div>
       <div>Columns: {{ props.data?.columns?.length || 0 }}</div>
       <div>Table rows: {{ table.getRowModel().rows.length }}</div>
@@ -13,7 +13,7 @@
     <!-- Table Container -->
     <div 
       ref="tableContainerRef" 
-      class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white relative mx-2 mb-2"
+      class="tw:flex-1 tw:overflow-auto tw:border tw:border-gray-200 dark:tw:border-gray-700 tw:rounded-lg tw:bg-white tw:relative tw:mx-2 tw:mb-2"
     >
       <!-- Enhanced Skeleton Loading with Quasar Components -->
       <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="w-full">
@@ -65,26 +65,26 @@
       </div>
       
       <!-- No Data Message -->
-      <div v-else-if="!props.data?.rows || props.data.rows.length === 0" class="p-8 text-center text-gray-500">
+      <div v-else-if="!props.data?.rows || props.data.rows.length === 0" class="tw:p-8 tw:text-center tw:text-gray-500">
         <div v-if="isLoading">Loading...</div>
         <div v-else>No data available</div>
       </div>
       
       <!-- Data Table -->
-      <table v-else class="border-collapse" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }" :key="tableKey">
+      <table v-else class="tw:border-collapse" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }" :key="tableKey">
         <!-- Header -->
-        <thead class="bg-gray-50 sticky top-0 z-10">
+        <thead class="tw:bg-gray-50 tw:sticky tw:top-0 tw:z-10">
           <tr v-for="headerGroup in (table?.getHeaderGroups?.() || [])" :key="headerGroup.id">
             <th
               v-for="header in headerGroup.headers"
               :key="header.id"
               :style="{ width: `${header.getSize()}px` }"
               :class="[
-                'border-b border-gray-200 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative',
+                'tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-left tw:text-xs tw:font-medium tw:text-gray-500 tw:uppercase tw:tracking-wider tw:relative',
                 {
-                  'cursor-move': header.id !== 'select' && header.id !== 'expander',
-                  'opacity-50': isDragging && draggedColumnId === header.id,
-                  'bg-blue-50': isDragging && draggedColumnId !== header.id
+                  'tw:cursor-move': header.id !== 'select' && header.id !== 'expander',
+                  'tw:opacity-50': isDragging && draggedColumnId === header.id,
+                  'tw:bg-blue-50': isDragging && draggedColumnId !== header.id
                 }
               ]"
               :draggable="header.id !== 'select' && header.id !== 'expander'"
@@ -93,7 +93,7 @@
               @drop="header.id !== 'select' && header.id !== 'expander' ? handleDrop(header.id, $event) : null"
               @dragend="handleDragEnd"
             >
-              <div class="flex items-center gap-2">
+              <div class="tw:flex tw:items-center tw:gap-2">
                 <!-- Selection Header -->
                 <template v-if="header.id === 'select'">
                   <q-checkbox
@@ -108,7 +108,7 @@
                   <span>{{ header.column.columnDef.header }}</span>
                   
                   <!-- Sort Indicator -->
-                  <div v-if="header.column.getCanSort()" class="flex flex-col ml-1">
+                  <div v-if="header.column.getCanSort()" class="tw:flex tw:flex-col tw:ml-1">
                     <q-btn
                       flat
                       dense
@@ -132,25 +132,25 @@
               <!-- Drop Indicator -->
               <div
                 v-if="isDragging && dropIndicatorPosition !== null"
-                class="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-20 pointer-events-none"
+                class="tw:absolute tw:top-0 tw:bottom-0 tw:w-0.5 tw:bg-blue-500 tw:z-20 tw:pointer-events-none"
                 :style="{ left: `${dropIndicatorPosition}px` }"
               />
               
               <!-- Resize Handle -->
               <div
                 v-if="header.column.getCanResize() && header.id !== 'select' && header.id !== 'expander'"
-                class="resize-handle absolute right-0 top-0 h-full w-2 cursor-col-resize group"
+                class="resize-handle tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-2 tw:cursor-col-resize tw:group"
                 @mousedown="startResize(header.column.id, $event)"
                 @dblclick="handleColumnDoubleClick(header.column.id)"
               >
-                <div class="h-full w-px bg-gray-300 group-hover:bg-blue-500 group-hover:w-0.5 transition-all ml-auto"></div>
+                <div class="tw:h-full tw:w-px tw:bg-gray-300 group-hover:tw:bg-blue-500 group-hover:tw:w-0.5 tw:transition-all tw:ml-auto"></div>
               </div>
             </th>
           </tr>
         </thead>
 
         <!-- Body with Virtual Scrolling -->
-        <tbody class="bg-white divide-y divide-gray-200">
+        <tbody class="tw:bg-white tw:divide-y tw:divide-gray-200">
           <!-- Top spacer -->
           <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
             <td :colspan="columns.length" :style="{ height: `${rowVirtualizer.getVirtualItems()[0]?.start || 0}px`, padding: 0, border: 'none' }"></td>
@@ -184,7 +184,7 @@
                     class="group-header-cell"
                     :style="{ paddingLeft: `${(row.depth * 1.5) + 1}rem` }"
                   >
-                    <div class="tw-flex tw-items-center tw-gap-3">
+                    <div class="tw:flex tw:items-center tw:gap-3">
                       <!-- Expand/Collapse Icon -->
                       <q-icon 
                         :name="row.getIsExpanded() ? 'expand_more' : 'chevron_right'"
@@ -193,7 +193,7 @@
                       />
                       
                       <!-- Group Value Display -->
-                      <div class="tw-flex tw-items-center tw-gap-2 tw-flex-1">
+                      <div class="tw:flex tw:items-center tw:gap-2 tw:flex-1">
                         <span class="group-label">
                           <template v-for="cell in row.getVisibleCells()" :key="cell.id">
                             <template v-if="cell.getIsGrouped()">
@@ -205,7 +205,7 @@
                                 size="sm"
                                 color="primary"
                                 text-color="white"
-                                class="tw-ml-2"
+                                class="tw:ml-2"
                                 @click.stop
                               >
                                 {{ getGroupCustomLabel(cell, row) }}
@@ -242,7 +242,7 @@
                       <!-- Aggregated Values -->
                       <div 
                         v-if="row.getIsExpanded() && hasAggregations(row)"
-                        class="tw-flex tw-items-center tw-gap-4 tw-ml-4"
+                        class="tw:flex tw:items-center tw:gap-4 tw:ml-4"
                       >
                         <div 
                           v-for="cell in row.getVisibleCells().filter(c => c.getIsAggregated() && !c.getIsGrouped())" 
@@ -259,7 +259,7 @@
                     <template v-for="cell in row.getVisibleCells()" :key="`metadata-${cell.id}`">
                       <div
                         v-if="cell.getIsGrouped() && getGroupCustomization(cell.column.id, cell.getValue())?.metadata"
-                        class="tw-mt-2 tw-text-xs tw-text-gray-600 dark:tw-text-gray-400 tw-italic"
+                        class="tw:mt-2 tw:text-xs tw:text-gray-600 dark:tw:text-gray-400 tw:italic"
                         :style="{ paddingLeft: '2.5rem' }"
                         @click.stop
                       >
@@ -273,7 +273,7 @@
                 <tr 
                   v-else-if="!row.getIsGrouped()"
                   :class="getRowClass(row)"
-                  class="hover:tw-bg-gray-50 data-row"
+                  class="hover:tw:bg-gray-50 data-row"
                 >
                   <td
                     v-for="(cell, cellIndex) in (row?.getVisibleCells?.() || [])"
@@ -284,7 +284,7 @@
                       maxWidth: `${cell.column.getSize()}px`,
                       paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
                     }"
-                    class="tw-border-b tw-border-gray-200 tw-px-4 tw-py-3 tw-text-sm tw-overflow-hidden"
+                    class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-sm tw:overflow-hidden"
                   >
                     <!-- Expander Cell -->
                     <ExpanderCell
@@ -317,7 +317,7 @@
                 
                 <!-- Detail Panel Row -->
                 <tr v-if="!(grouping.length > 0 && row.getIsGrouped) && row.getIsExpanded?.()" :key="`${row.id}-detail`">
-                  <td :colspan="row.getVisibleCells().length" class="tw-p-0">
+                  <td :colspan="row.getVisibleCells().length" class="tw:p-0">
                     <DetailPanel
                       :row="row.original"
                       :row-id="row.original.id"
@@ -375,15 +375,15 @@
       </div>
 
       <!-- Loading Overlay -->
-      <div v-if="isLoading" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+      <div v-if="isLoading" class="tw:absolute tw:inset-0 tw:bg-white tw:bg-opacity-75 tw:flex tw:items-center tw:justify-center">
         <q-spinner-dots size="50px" color="primary" />
       </div>
     </div>
 
     <!-- Status Bar -->
-    <div class="flex-none bg-white dark:bg-neutral-900 border-t px-4 py-1.5 flex items-center justify-between text-xs text-gray-500">
+    <div class="tw:flex-none tw:bg-white dark:tw:bg-neutral-900 tw:border-t tw:px-3 tw:py-1.5 tw:flex tw:items-center tw:justify-between tw:text-xs tw:text-gray-500">
       <span>{{ totalRows.toLocaleString() }} total rows{{ props.isFetchingNext ? ' · Loading more...' : (props.hasNextPage ? ' · Scroll to load more' : '') }}</span>
-      <span v-if="selectedCount > 0" class="text-primary font-medium">{{ selectedCount }} selected</span>
+      <span v-if="selectedCount > 0" class="text-primary tw:font-medium">{{ selectedCount }} selected</span>
     </div>
 
     <!-- Bulk Actions Bar -->

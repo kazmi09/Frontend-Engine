@@ -1,14 +1,14 @@
 <template>
-  <div class="bg-white dark:bg-neutral-900 border-b px-4 py-2 flex items-center justify-between gap-3 flex-none min-h-[52px]">
+  <div class="tw:bg-white dark:tw:bg-neutral-900 tw:border-b tw:px-3 tw:py-1.5 tw:flex tw:items-center tw:justify-between tw:gap-3 tw:flex-none tw:min-h-[48px]">
     <!-- Left side: Search and Filter -->
-    <div class="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
+    <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1 tw:min-w-0 tw:flex-wrap">
       <!-- Search Input -->
       <q-input
         :model-value="searchText"
         outlined
         dense
         placeholder="Search..."
-        class="min-w-[200px] max-w-xs flex-1"
+        class="tw:min-w-[200px] tw:max-w-xs tw:flex-1"
         clearable
         @update:model-value="(val) => gridStore.setSearchText(val != null ? String(val) : '')"
         @clear="clearSearch"
@@ -27,7 +27,7 @@
         emit-value
         map-options
         placeholder="Filter by column"
-        class="min-w-[160px] max-w-[200px]"
+        class="tw:min-w-[160px] tw:max-w-[200px]"
         clearable
         @update:model-value="(val) => gridStore.setFilterBy(val ?? '')"
         @clear="clearFilter"
@@ -51,10 +51,11 @@
     </div>
 
     <!-- Right side: Actions -->
-    <div class="flex items-center gap-1 flex-none flex-wrap justify-end">
+    <div class="tw:flex tw:items-center tw:gap-1 tw:flex-none tw:flex-wrap tw:justify-end">
       <!-- Column Visibility -->
       <q-btn-dropdown
         flat
+        dense
         icon="view_column"
         label="Columns"
         dropdown-icon="expand_more"
@@ -82,6 +83,7 @@
       <!-- Reset Layout -->
       <q-btn
         flat
+        dense
         icon="restore"
         @click="gridStore.resetLayout"
       >
@@ -92,6 +94,7 @@
       <q-btn-dropdown
         v-if="groupableColumns.length > 0"
         flat
+        dense
         icon="workspaces"
         :label="hasActiveGrouping ? `Group By (${grouping.length})` : 'Group By'"
         dropdown-icon="expand_more"
@@ -130,7 +133,7 @@
               <q-icon name="clear" color="negative" />
             </q-item-section>
             <q-item-section>
-              <q-item-label class="tw-text-red-600">Clear All Grouping</q-item-label>
+              <q-item-label class="tw:text-red-600">Clear All Grouping</q-item-label>
             </q-item-section>
           </q-item>
         </q-list>
@@ -139,6 +142,7 @@
       <!-- Export (placeholder) -->
       <q-btn
         flat
+        dense
         icon="download"
         @click="exportData"
       >
@@ -154,7 +158,7 @@
         emit-value
         map-options
         label="Role"
-        class="min-w-[120px]"
+        class="tw:min-w-[120px]"
       >
         <template v-slot:prepend>
           <q-icon name="person_outline" />
@@ -324,6 +328,7 @@ const getGroupingLevel = (columnId: string): number => {
 
 <style lang="sass" scoped>
 .q-input, .q-select
-  .q-field__control
-    min-height: 40px
+  :deep(.q-field__control)
+    min-height: 32px
+    height: 32px
 </style>

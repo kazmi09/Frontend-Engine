@@ -1,17 +1,17 @@
 <template>
   <div 
-    class="relative w-full h-full flex items-center cell-container"
-    :style="{ minHeight: '40px', height: '40px' }"
+    class="tw:relative tw:w-full tw:h-full tw:flex tw:items-center cell-container"
+    :style="{ minHeight: '32px', height: '32px' }"
     :class="cellClass"
     @click="startEdit"
   >
     <!-- Display Mode -->
     <div 
       v-if="!isEditing" 
-      class="w-full px-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded overflow-hidden transition-colors"
-      :class="{ 'opacity-50': !isEditable }"
+      class="tw:w-full tw:px-1.5 tw:py-0.5 tw:cursor-pointer hover:tw:bg-gray-50 dark:hover:tw:bg-gray-800 tw:rounded tw:overflow-hidden tw:transition-colors"
+      :class="{ 'tw:opacity-50': !isEditable }"
     >
-      <div class="truncate">
+      <div class="tw:truncate tw:block tw:w-full">
         <component 
           :is="displayComponent" 
           :value="displayValue" 
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Edit Mode -->
-    <div v-else class="w-full h-full flex items-center edit-mode-container">
+    <div v-else class="tw:w-full tw:h-full tw:flex tw:items-center edit-mode-container">
       <component
         :is="editComponent"
         v-model="editValue"
@@ -44,7 +44,7 @@
     </div>
 
     <!-- Loading Indicator -->
-    <div v-if="isCellLoading" class="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80">
+    <div v-if="isCellLoading" class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:bg-white/80 dark:tw:bg-gray-900/80">
       <q-spinner
         size="20px"
         color="primary"
@@ -56,7 +56,7 @@
       v-else-if="error"
       name="error"
       size="18px"
-      class="absolute top-2 right-2 text-negative"
+      class="tw:absolute tw:top-1 tw:right-1 tw:text-negative"
     >
       <q-tooltip>{{ error }}</q-tooltip>
     </q-icon>

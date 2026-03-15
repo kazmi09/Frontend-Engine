@@ -1,29 +1,31 @@
 <template>
-  <div class="h-full w-full flex flex-col bg-slate-50 dark:bg-neutral-950 overflow-hidden">
+  <div class="tw:h-full tw:w-full tw:flex tw:flex-col tw:bg-slate-50 dark:tw:bg-neutral-950 tw:overflow-hidden">
     <!-- Top Navigation -->
-    <header class="h-14 border-b bg-white dark:bg-neutral-900 flex items-center px-6 justify-between flex-none z-30">
-      <div class="flex items-center gap-4">
+    <header class="tw:h-12 tw:border-b tw:bg-white dark:tw:bg-neutral-900 tw:flex tw:items-center tw:px-4 tw:justify-between tw:flex-none tw:z-30">
+      <div class="tw:flex tw:items-center tw:gap-4">
         <q-icon :name="gridIcon" size="md" class="text-primary" />
       </div>
       
-      <div class="flex items-center gap-2">
+      <div class="tw:flex tw:items-center tw:gap-2">
         <q-btn
           flat
+          dense
           round
           icon="refresh"
           @click="() => refetch()"
           :loading="isRefetching"
-          class="text-gray-600"
+          class="tw:text-gray-600"
         >
           <q-tooltip>Refresh Data</q-tooltip>
         </q-btn>
         
         <q-btn
           flat
+          dense
           icon="arrow_back"
           label="Back"
           @click="$router.back()"
-          class="text-gray-600"
+          class="tw:text-gray-600"
         />
       </div>
     </header>
@@ -38,8 +40,8 @@
     />
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col overflow-hidden">
-      <div v-if="error" class="p-4">
+    <main class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden">
+      <div v-if="error" class="tw:p-4">
         <q-banner class="text-negative">
           <template v-slot:avatar>
             <q-icon name="error" />
@@ -49,16 +51,15 @@
       </div>
       
       <!-- Show skeleton on initial load -->
-      <div v-else-if="isLoading && !data" class="flex-1 overflow-hidden">
-        <GridToolbar :columns="[]" />
-        <div class="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-white m-6">
+      <div v-else-if="isLoading && !data" class="tw:flex-1 tw:overflow-hidden">
+        <div class="tw:flex-1 tw:overflow-auto tw:border tw:border-gray-200 dark:tw:border-gray-700 tw:rounded-lg tw:bg-white tw:m-6">
           <q-markup-table flat bordered class="skeleton-table">
             <thead>
               <tr>
-                <th class="text-left" style="width: 50px">
+                <th class="tw:text-left" style="width: 50px">
                   <q-skeleton type="QCheckbox" animation="wave" />
                 </th>
-                <th v-for="i in 7" :key="i" class="text-left">
+                <th v-for="i in 7" :key="i" class="tw:text-left">
                   <q-skeleton type="text" animation="wave" />
                 </th>
               </tr>
@@ -87,7 +88,7 @@
         :display-name="displayName"
         :display-name-plural="displayNamePlural"
         :active-role="effectiveRole"
-        class="flex-1"
+        class="tw:flex-1"
         @load-more="() => fetchNextPage()"
         @bulk-edit="handleBulkEdit"
         @bulk-archive="handleBulkArchive"
