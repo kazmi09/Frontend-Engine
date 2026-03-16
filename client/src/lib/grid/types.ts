@@ -121,9 +121,18 @@ export interface GridState {
 
 export interface FilterState {
   [columnId: string]: {
-    value: any;
-    operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'gt' | 'lt' | 'gte' | 'lte';
+    value: any | any[];
+    operator: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'gt' | 'lt' | 'gte' | 'lte' | 'in' | 'between';
   };
+}
+
+/**
+ * Lightweight column-level filter state used by inline header filters.
+ * Each key is a columnId, value is either a single string/number or an array
+ * of values for multi-select columns.
+ */
+export interface ColumnFilterState {
+  [columnId: string]: string | number | boolean | (string | number | boolean)[];
 }
 
 export interface DataRow {

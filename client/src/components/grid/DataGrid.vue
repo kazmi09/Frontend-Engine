@@ -108,23 +108,32 @@
                   <span>{{ header.column.columnDef.header }}</span>
                   
                   <!-- Sort Indicator -->
-                  <div v-if="header.column.getCanSort()" class="tw:flex tw:flex-col tw:ml-1">
-                    <q-btn
-                      flat
-                      dense
-                      size="xs"
-                      icon="keyboard_arrow_up"
-                      :class="getSortButtonClass(header.column.id, false)"
-                      @click="handleSort(header.column.id, false)"
-                    />
-                    <q-btn
-                      flat
-                      dense
-                      size="xs"
-                      icon="keyboard_arrow_down"
-                      :class="getSortButtonClass(header.column.id, true)"
-                      @click="handleSort(header.column.id, true)"
-                    />
+                  <div v-if="header.column.getCanSort()" class="tw:flex tw:items-center tw:gap-0.5 tw:ml-1">
+                    <div class="tw:flex tw:flex-col">
+                      <q-btn
+                        flat
+                        dense
+                        size="xs"
+                        icon="keyboard_arrow_up"
+                        :class="getSortButtonClass(header.column.id, false)"
+                        @click="handleSort(header.column.id, false, $event as MouseEvent)"
+                      />
+                      <q-btn
+                        flat
+                        dense
+                        size="xs"
+                        icon="keyboard_arrow_down"
+                        :class="getSortButtonClass(header.column.id, true)"
+                        @click="handleSort(header.column.id, true, $event as MouseEvent)"
+                      />
+                    </div>
+                    <!-- Multi-sort priority badge -->
+                    <span
+                      v-if="sorting.length > 1 && getSortPriority(header.column.id) > 0"
+                      class="sort-priority-badge"
+                    >
+                      {{ getSortPriority(header.column.id) }}
+                    </span>
                   </div>
                 </template>
               </div>
@@ -145,6 +154,67 @@
               >
                 <div class="tw:h-full tw:w-px tw:bg-gray-300 group-hover:tw:bg-blue-500 group-hover:tw:w-0.5 tw:transition-all tw:ml-auto"></div>
               </div>
+            </th>
+          </tr>
+
+          <!-- Inline Column Filter Row -->
+          <tr class="filter-header-row">
+            <th
+              v-for="header in (table?.getHeaderGroups?.()[0]?.headers || [])"
+              :key="`filter-${header.id}`"
+              :style="{ width: `${header.getSize()}px` }"
+              class="tw:border-b tw:border-gray-200 tw:px-1 tw:py-1 tw:bg-gray-50"
+            >
+              <!-- No filter for special columns -->
+              <template v-if="header.id === 'select' || header.id === 'expander'">
+                &nbsp;
+              </template>
+
+              <!-- Select column: multi-select dropdown -->
+              <template v-else-if="getColumnConfig(header.column.id)?.type === 'select'">
+                <q-select
+                  :model-value="getColumnFilterValue(header.column.id)"
+                  :options="getColumnConfig(header.column.id)?.options || []"
+                  outlined
+                  dense
+                  multiple
+                  use-chips
+                  emit-value
+                  clearable
+                  placeholder="All"
+                  class="inline-filter-select"
+                  @update:model-value="(val) => handleSelectFilter(header.column.id, val)"
+                />
+              </template>
+
+              <!-- Number column: number input -->
+              <template v-else-if="getColumnConfig(header.column.id)?.type === 'number'">
+                <q-input
+                  :model-value="String(getColumnFilterValue(header.column.id) ?? '')"
+                  outlined
+                  dense
+                  type="number"
+                  placeholder="Filter..."
+                  clearable
+                  class="inline-filter-input"
+                  @update:model-value="(val) => handleInlineFilter(header.column.id, val)"
+                  @clear="gridStore.removeColumnFilter(header.column.id)"
+                />
+              </template>
+
+              <!-- String / Date / Boolean column: text input -->
+              <template v-else>
+                <q-input
+                  :model-value="String(getColumnFilterValue(header.column.id) ?? '')"
+                  outlined
+                  dense
+                  placeholder="Filter..."
+                  clearable
+                  class="inline-filter-input"
+                  @update:model-value="(val) => handleInlineFilter(header.column.id, val != null ? String(val) : '')"
+                  @clear="gridStore.removeColumnFilter(header.column.id)"
+                />
+              </template>
             </th>
           </tr>
         </thead>
@@ -409,9 +479,11 @@ import {
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
   getExpandedRowModel,
   getGroupedRowModel,
   type ColumnDef,
+  type ColumnFiltersState,
 } from '@tanstack/vue-table'
 import { useGridStore } from '@/lib/grid/store'
 import { useGridStateStore } from '@/stores/gridState'
@@ -484,7 +556,9 @@ const {
   rowSelection,
   expandedRows,
   grouping,
-  groupExpanded
+  groupExpanded,
+  columnFilters,
+  tanstackColumnFilters
 } = storeToRefs(gridStore)
 
 const { user } = storeToRefs(authStore)
@@ -546,7 +620,7 @@ const columns = computed<ColumnDef<any>[]>(() => {
 
   const dataColumns: ColumnDef<any>[] = props.data.columns.map((col) => {
     // Determine aggregation function based on column type
-    let aggregationFn: string | undefined
+    let aggregationFn: 'mean' | 'count' | 'sum' | 'min' | 'max' | 'extent' | 'median' | 'unique' | 'uniqueCount' | undefined
     if (col.type === 'number') {
       aggregationFn = 'mean' // Use mean for numeric columns
     } else if (col.type === 'boolean') {
@@ -565,6 +639,23 @@ const columns = computed<ColumnDef<any>[]>(() => {
       enableSorting: true,
       enableHiding: true,
       enableGrouping: true, // Enable grouping for data columns
+      enableColumnFilter: true,
+      // Custom filter function that handles both single and multi-value (array) filters
+      filterFn: (row: any, columnId: string, filterValue: any) => {
+        const cellValue = row.getValue(columnId)
+        if (filterValue === null || filterValue === undefined || filterValue === '') return true
+        // Multi-value filter (used by select columns)
+        if (Array.isArray(filterValue)) {
+          if (filterValue.length === 0) return true
+          return filterValue.some((v: any) => String(cellValue).toLowerCase() === String(v).toLowerCase())
+        }
+        // Number equality
+        if (col.type === 'number') {
+          return Number(cellValue) === Number(filterValue)
+        }
+        // String contains (default)
+        return String(cellValue ?? '').toLowerCase().includes(String(filterValue).toLowerCase())
+      },
       // Aggregation function for grouped rows
       aggregationFn: aggregationFn,
       // Custom aggregation renderer
@@ -623,6 +714,9 @@ const table = useVueTable({
     },
     get sorting() { 
       return sorting.value 
+    },
+    get columnFilters() {
+      return tanstackColumnFilters.value as ColumnFiltersState
     },
     get grouping() {
       return grouping.value
@@ -729,8 +823,23 @@ const table = useVueTable({
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
+  getFilteredRowModel: getFilteredRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
   getGroupedRowModel: getGroupedRowModel(),
+  enableColumnFilters: true,
+  onColumnFiltersChange: (updater: any) => {
+    const newFilters = typeof updater === 'function' ? updater(tanstackColumnFilters.value) : updater
+    // Sync back to store
+    const filterRecord: Record<string, any> = {}
+    newFilters.forEach((f: { id: string; value: any }) => {
+      filterRecord[f.id] = f.value
+    })
+    // Clear old filters and set new ones
+    gridStore.clearAllColumnFilters()
+    Object.entries(filterRecord).forEach(([id, value]) => {
+      gridStore.setColumnFilter(id, value)
+    })
+  },
   getRowId: (row, index) => {
     // Use the primary key from the data result, fallback to 'id'
     const primaryKey = props.data?.primaryKey || 'id'
@@ -1250,19 +1359,86 @@ const handleRetryDetailLoad = async (rowId: string) => {
 const getSortButtonClass = (columnId: string, desc: boolean) => {
   const sortState = sorting.value.find(s => s.id === columnId)
   const isActive = sortState && sortState.desc === desc
-  return isActive ? 'text-blue-600' : 'text-gray-400'
+  return isActive ? 'text-blue-600 tw:font-bold' : 'text-gray-400'
 }
 
-const handleSort = (columnId: string, desc: boolean) => {
-  console.log('Sort clicked:', { columnId, desc })
+// Get the sort priority index (1-based) for multi-column sort display
+const getSortPriority = (columnId: string): number => {
+  const index = sorting.value.findIndex(s => s.id === columnId)
+  return index >= 0 ? index + 1 : -1
+}
+
+const handleSort = (columnId: string, desc: boolean, event?: MouseEvent) => {
+  console.log('Sort clicked:', { columnId, desc, shiftKey: event?.shiftKey })
   
   const column = table.getColumn(columnId)
-  if (column) {
-    console.log('Column found, toggling sort')
-    column.toggleSorting(desc)
-  } else {
+  if (!column) {
     console.log('Column not found:', columnId)
+    return
   }
+
+  if (event?.shiftKey) {
+    // Multi-column sort: add/toggle this column in the existing sort array
+    const existingIndex = sorting.value.findIndex(s => s.id === columnId)
+    const newSorting = [...sorting.value]
+    
+    if (existingIndex >= 0) {
+      // Column already in sort — check if same direction
+      if (newSorting[existingIndex].desc === desc) {
+        // Same direction clicked again: remove from multi-sort
+        newSorting.splice(existingIndex, 1)
+      } else {
+        // Different direction: update direction
+        newSorting[existingIndex] = { id: columnId, desc }
+      }
+    } else {
+      // New column: append to sort array
+      newSorting.push({ id: columnId, desc })
+    }
+    
+    gridStore.setSorting(newSorting)
+  } else {
+    // Single-column sort: replace all sorting with just this column
+    const currentSort = sorting.value.find(s => s.id === columnId)
+    if (currentSort && currentSort.desc === desc) {
+      // Already sorted in this direction: clear sort
+      gridStore.setSorting([])
+    } else {
+      gridStore.setSorting([{ id: columnId, desc }])
+    }
+  }
+}
+
+// Debounce timer refs for inline filter inputs
+const filterDebounceTimers = ref<Record<string, ReturnType<typeof setTimeout>>>({})
+
+const handleInlineFilter = (columnId: string, value: any, debounceMs = 300) => {
+  // Clear previous debounce
+  if (filterDebounceTimers.value[columnId]) {
+    clearTimeout(filterDebounceTimers.value[columnId])
+  }
+  
+  filterDebounceTimers.value[columnId] = setTimeout(() => {
+    if (value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+      gridStore.removeColumnFilter(columnId)
+    } else {
+      gridStore.setColumnFilter(columnId, value)
+    }
+  }, debounceMs)
+}
+
+// Immediate filter for select dropdowns (no debounce needed)
+const handleSelectFilter = (columnId: string, value: any) => {
+  if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+    gridStore.removeColumnFilter(columnId)
+  } else {
+    gridStore.setColumnFilter(columnId, value)
+  }
+}
+
+// Get current filter value for a given column (for v-model binding)
+const getColumnFilterValue = (columnId: string) => {
+  return columnFilters.value[columnId] ?? (getColumnConfig(columnId).type === 'select' ? [] : '')
 }
 
 // Column resizing - use composable
@@ -1757,5 +1933,48 @@ table
 
 .fade-enter-from, .fade-leave-to
   opacity: 0
+
+// Sort priority badge for multi-column sort
+.sort-priority-badge
+  display: inline-flex
+  align-items: center
+  justify-content: center
+  width: 16px
+  height: 16px
+  border-radius: 50%
+  background-color: #1976d2
+  color: white
+  font-size: 10px
+  font-weight: 700
+  line-height: 1
+  flex-shrink: 0
+
+// Inline column filter row
+.filter-header-row
+  th
+    padding: 2px 4px !important
+    background-color: #fafbfc
+
+  .inline-filter-input, .inline-filter-select
+    :deep(.q-field__control)
+      min-height: 28px
+      height: 28px
+      font-size: 12px
+
+    :deep(.q-field__marginal)
+      height: 28px
+
+    :deep(.q-field__native)
+      padding: 0 4px
+      font-size: 12px
+
+    :deep(.q-field__append)
+      padding: 0
+
+  .inline-filter-select
+    :deep(.q-chip)
+      margin: 1px
+      height: 18px
+      font-size: 10px
 
 </style>

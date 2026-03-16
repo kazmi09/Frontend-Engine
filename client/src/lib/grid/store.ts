@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { GridState, FilterState, DetailPanelState } from './types'
+import { GridState, FilterState, DetailPanelState, ColumnFilterState } from './types'
 import { OnChangeFn, ColumnSizingState, VisibilityState, SortingState, ColumnOrderState, ColumnPinningState, RowSelectionState } from "@tanstack/vue-table"
 import { useCustomizationStore } from '@/stores/customization'
 
@@ -34,6 +34,9 @@ export const useGridStore = defineStore('grid', () => {
   const filterBy = ref('')
   const filters = ref<FilterState>({})
   
+  // Inline column filters (used by header filter row)
+  const columnFilters = ref<ColumnFilterState>({})
+  
   // Expansion state
   const expandedRows = ref<Record<string, boolean>>({})
   const detailPanelData = ref<DetailPanelState>({})
@@ -45,6 +48,21 @@ export const useGridStore = defineStore('grid', () => {
   // Computed
   const hasFilters = computed(() => Object.keys(filters.value).length > 0)
   const hasSearch = computed(() => searchText.value.length > 0)
+  const hasColumnFilters = computed(() => Object.keys(columnFilters.value).length > 0)
+  // Returns only non-empty column filter entries
+  const activeColumnFilters = computed(() => {
+    const active: ColumnFilterState = {}
+    for (const [key, val] of Object.entries(columnFilters.value)) {
+      if (val === '' || val === null || val === undefined) continue
+      if (Array.isArray(val) && val.length === 0) continue
+      active[key] = val
+    }
+    return active
+  })
+  // TanStack-compatible columnFilters array derived from the columnFilters record
+  const tanstackColumnFilters = computed(() => {
+    return Object.entries(activeColumnFilters.value).map(([id, value]) => ({ id, value }))
+  })
   const expandedRowIds = computed(() => 
     Object.keys(expandedRows.value).filter(id => expandedRows.value[id])
   )
@@ -148,6 +166,25 @@ export const useGridStore = defineStore('grid', () => {
     searchText.value = ''
     filterBy.value = ''
     filters.value = {}
+    columnFilters.value = {}
+    pageIndex.value = 0
+  }
+  
+  // Inline column filter actions
+  const setColumnFilter = (columnId: string, value: string | number | boolean | (string | number | boolean)[]) => {
+    columnFilters.value = { ...columnFilters.value, [columnId]: value }
+    pageIndex.value = 0
+  }
+  
+  const removeColumnFilter = (columnId: string) => {
+    const next = { ...columnFilters.value }
+    delete next[columnId]
+    columnFilters.value = next
+    pageIndex.value = 0
+  }
+  
+  const clearAllColumnFilters = () => {
+    columnFilters.value = {}
     pageIndex.value = 0
   }
   
@@ -306,10 +343,14 @@ export const useGridStore = defineStore('grid', () => {
     searchText,
     filterBy,
     filters,
+    columnFilters,
     
     // Computed
     hasFilters,
     hasSearch,
+    hasColumnFilters,
+    activeColumnFilters,
+    tanstackColumnFilters,
     expandedRowIds,
     
     // Actions
@@ -326,6 +367,9 @@ export const useGridStore = defineStore('grid', () => {
     setFilter,
     resetLayout,
     resetFilters,
+    setColumnFilter,
+    removeColumnFilter,
+    clearAllColumnFilters,
     
     // Expansion state
     expandedRows,

@@ -18,35 +18,44 @@
         </template>
       </q-input>
 
-      <!-- Filter By Select -->
-      <q-select
-        :model-value="filterBy"
-        :options="filterOptions"
-        outlined
-        dense
-        emit-value
-        map-options
-        placeholder="Filter by column"
-        class="tw:min-w-[160px] tw:max-w-[200px]"
-        clearable
-        @update:model-value="(val) => gridStore.setFilterBy(val ?? '')"
-        @clear="clearFilter"
-      >
-        <template v-slot:prepend>
-          <q-icon name="filter_list" />
-        </template>
-      </q-select>
+      <!-- Active Column Filter Chips -->
+      <template v-if="hasColumnFilters">
+        <q-chip
+          v-for="(value, columnId) in activeColumnFilters"
+          :key="columnId"
+          removable
+          @remove="gridStore.removeColumnFilter(String(columnId))"
+          color="primary"
+          text-color="white"
+          size="sm"
+          icon="filter_list"
+        >
+          {{ getColumnLabel(String(columnId)) }}: {{ formatFilterValue(value) }}
+        </q-chip>
+        <q-chip
+          v-if="columnFilterCount > 1"
+          removable
+          @remove="gridStore.clearAllColumnFilters"
+          color="red"
+          text-color="white"
+          size="sm"
+          icon="filter_list_off"
+        >
+          Clear All ({{ columnFilterCount }})
+        </q-chip>
+      </template>
 
-      <!-- Active Filters Indicator -->
+      <!-- Active Search Indicator -->
       <q-chip
-        v-if="hasActiveFilters"
+        v-if="hasSearch"
         removable
-        @remove="gridStore.resetFilters"
-        color="primary"
+        @remove="clearSearch"
+        color="blue-grey"
         text-color="white"
-        icon="filter_list"
+        size="sm"
+        icon="search"
       >
-        {{ activeFiltersCount }} filter{{ activeFiltersCount > 1 ? 's' : '' }}
+        Search: "{{ searchText }}"
       </q-chip>
     </div>
 
@@ -202,6 +211,8 @@ const {
   columnVisibility,
   hasFilters,
   hasSearch,
+  hasColumnFilters,
+  activeColumnFilters,
   grouping
 } = storeToRefs(gridStore)
 
@@ -244,14 +255,22 @@ const groupableColumns = computed(() => {
   return props.columns.filter(col => props.groupableColumns?.includes(col.id))
 })
 
-// Active filters count
-const hasActiveFilters = computed(() => hasFilters.value || hasSearch.value)
-const activeFiltersCount = computed(() => {
-  let count = 0
-  if (hasSearch.value) count++
-  if (hasFilters.value) count += Object.keys(filters.value).length
-  return count
-})
+// Column filter count
+const columnFilterCount = computed(() => Object.keys(activeColumnFilters.value).length)
+
+// Get column label by id
+const getColumnLabel = (columnId: string): string => {
+  const col = props.columns?.find(c => c.id === columnId)
+  return col?.label || columnId
+}
+
+// Format filter value for display in chip
+const formatFilterValue = (value: any): string => {
+  if (Array.isArray(value)) {
+    return value.join(', ')
+  }
+  return String(value)
+}
 
 // Column visibility helpers
 const isColumnVisible = (columnId: string) => {
@@ -276,12 +295,6 @@ const toggleColumnVisibility = (columnId: string) => {
 
 // Actions
 const clearSearch = () => {
-  gridStore.setSearchText('')
-  gridStore.setFilterBy('')
-}
-
-const clearFilter = () => {
-  gridStore.setFilterBy('')
   gridStore.setSearchText('')
 }
 
