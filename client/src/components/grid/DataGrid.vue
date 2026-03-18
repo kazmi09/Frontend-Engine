@@ -70,10 +70,11 @@
         <div v-else>No data available</div>
       </div>
       
-      <!-- Data Table -->
-      <table v-else class="tw:border-collapse" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }" :key="tableKey">
+      <!-- Data Table wrapped in q-markup-table for consistent styling -->
+      <q-markup-table v-else flat bordered dense class="grid-table-wrapper" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }">
+        <table class="tw:border-collapse full-width" :style="{ width: '100%' }" :key="tableKey">
         <!-- Header -->
-        <thead class="tw:bg-gray-50 tw:sticky tw:top-0 tw:z-10">
+        <thead class="tw:sticky tw:top-0 tw:z-10 bg-grey-2">
           <tr v-for="headerGroup in (table?.getHeaderGroups?.() || [])" :key="headerGroup.id">
             <th
               v-for="header in headerGroup.headers"
@@ -413,6 +414,7 @@
           </tr>
         </tbody>
       </table>
+    </q-markup-table>
 
       <!-- Loading More Skeleton (Infinite Scroll) -->
       <div v-if="isFetchingNext" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }">
@@ -451,9 +453,9 @@
     </div>
 
     <!-- Status Bar -->
-    <div class="tw:flex-none tw:bg-white dark:tw:bg-neutral-900 tw:border-t tw:px-3 tw:py-1.5 tw:flex tw:items-center tw:justify-between tw:text-xs tw:text-gray-500">
+    <div class="tw:flex-none q-py-xs q-px-sm tw:border-t flex items-center justify-between text-caption text-grey-7 bg-white dark:bg-dark">
       <span>{{ totalRows.toLocaleString() }} total rows{{ props.isFetchingNext ? ' · Loading more...' : (props.hasNextPage ? ' · Scroll to load more' : '') }}</span>
-      <span v-if="selectedCount > 0" class="text-primary tw:font-medium">{{ selectedCount }} selected</span>
+      <span v-if="selectedCount > 0" class="text-primary text-weight-medium">{{ selectedCount }} selected</span>
     </div>
 
     <!-- Bulk Actions Bar -->

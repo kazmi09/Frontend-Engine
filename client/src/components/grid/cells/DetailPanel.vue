@@ -9,7 +9,7 @@
         <!-- Loading State -->
         <div v-if="isLoading" class="detail-panel-loading">
           <q-spinner-dots size="40px" color="primary" />
-          <span class="text-sm text-gray-600 mt-2">Loading details...</span>
+          <span class="text-sm text-grey-7 mt-2">Loading details...</span>
         </div>
         
         <!-- Error State -->
@@ -115,12 +115,12 @@ onMounted(async () => {
 
 <style scoped>
 .detail-panel-row {
-  background-color: #f9fafb;
+  background-color: var(--q-grey-1);
 }
 
 .detail-panel-cell {
   padding: 0 !important;
-  border-bottom: 2px solid #e5e7eb;
+  border-bottom: 2px solid var(--q-grey-3);
 }
 
 .detail-panel-content {

@@ -1,7 +1,7 @@
 <template>
   <div 
     v-if="selectedCount > 0"
-    class="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg transition-transform duration-300 ease-in-out"
+    class="fixed-bottom bg-white dark:bg-dark border-top shadow-up-5 transition-transform duration-300 ease-in-out"
     :class="selectedCount > 0 ? 'translate-y-0' : 'translate-y-full'"
     style="z-index: 9999;"
   >
@@ -10,8 +10,8 @@
         <!-- Selection Info -->
         <div class="flex items-center gap-4">
           <div class="flex items-center gap-2">
-            <q-icon name="check_circle" class="text-blue-600" />
-            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <q-icon name="check_circle" color="primary" />
+            <span class="text-sm font-medium text-grey-9">
               {{ selectedCount }} {{ selectedCount === 1 ? (displayName || 'item') : (displayNamePlural || 'items') }} selected
             </span>
           </div>
@@ -35,9 +35,9 @@
             size="sm"
             icon="edit"
             label="Bulk Edit"
+            color="primary"
             @click="openBulkEditDialog"
             :loading="isLoading"
-            class="text-blue-600 border-blue-600 hover:bg-blue-50"
           />
           
           <q-btn
@@ -45,9 +45,9 @@
             size="sm"
             icon="download"
             label="Export"
+            color="positive"
             @click="exportSelected"
             :loading="isExporting"
-            class="text-green-600 border-green-600 hover:bg-green-50"
           />
           
           <q-btn
@@ -55,9 +55,9 @@
             size="sm"
             icon="archive"
             label="Archive"
+            color="warning"
             @click="archiveSelected"
             :loading="isArchiving"
-            class="text-orange-600 border-orange-600 hover:bg-orange-50"
           />
           
           <q-btn
@@ -65,9 +65,9 @@
             size="sm"
             icon="delete"
             label="Delete"
+            color="negative"
             @click="confirmDelete"
             :loading="isDeleting"
-            class="text-red-600 border-red-600 hover:bg-red-50"
           />
         </div>
       </div>

@@ -1,20 +1,17 @@
 <template>
-  <button
+  <q-btn
     v-if="canExpand"
-    @click.stop="handleToggle"
-    @keydown.enter.prevent="handleToggle"
-    @keydown.space.prevent="handleToggle"
+    flat
+    dense
+    round
+    size="sm"
+    :icon="isExpanded ? 'expand_more' : 'chevron_right'"
     class="expander-button"
+    :class="{ 'is-expanded': isExpanded }"
+    @click.stop="handleToggle"
     :aria-expanded="isExpanded ? 'true' : 'false'"
     :aria-label="isExpanded ? 'Collapse row' : 'Expand row'"
-    type="button"
-  >
-    <q-icon 
-      :name="isExpanded ? 'expand_more' : 'chevron_right'" 
-      size="sm"
-      class="transition-transform"
-    />
-  </button>
+  />
   <span v-else class="expander-placeholder"></span>
 </template>
 

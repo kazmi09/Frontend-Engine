@@ -34,70 +34,34 @@
           @click="field.editable !== false ? startEdit(field.id) : null"
         >
           <template v-if="editingField === field.id">
-            <!-- String/Text Input -->
-            <input
-              v-if="field.type === 'string'"
+            <!-- Quasar Input for String, Number, Date -->
+            <q-input
+              v-if="['string', 'number', 'date'].includes(field.type)"
               :ref="el => fieldRefs[field.id] = el"
               v-model="editValues[field.id]"
-              type="text"
-              class="field-input"
+              :type="field.type === 'date' ? 'date' : (field.type === 'number' ? 'number' : 'text')"
+              dense
+              outlined
+              class="field-input-quasar"
               @blur="saveField(field.id)"
               @keydown.enter="saveField(field.id)"
               @keydown.escape="cancelEdit"
             />
             
-            <!-- Number Input -->
-            <input
-              v-else-if="field.type === 'number'"
+            <!-- Quasar Select for Select and Boolean -->
+            <q-select
+              v-else-if="['select', 'boolean'].includes(field.type)"
               :ref="el => fieldRefs[field.id] = el"
               v-model="editValues[field.id]"
-              type="number"
-              class="field-input"
+              :options="field.type === 'boolean' ? [{label: 'Yes', value: true}, {label: 'No', value: false}] : field.options"
+              dense
+              outlined
+              emit-value
+              map-options
+              class="field-input-quasar"
               @blur="saveField(field.id)"
-              @keydown.enter="saveField(field.id)"
               @keydown.escape="cancelEdit"
             />
-            
-            <!-- Date Input -->
-            <input
-              v-else-if="field.type === 'date'"
-              :ref="el => fieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="date"
-              class="field-input"
-              @blur="saveField(field.id)"
-              @keydown.enter="saveField(field.id)"
-              @keydown.escape="cancelEdit"
-            />
-            
-            <!-- Select Input -->
-            <select
-              v-else-if="field.type === 'select'"
-              :ref="el => fieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              class="field-input"
-              @blur="saveField(field.id)"
-              @keydown.enter="saveField(field.id)"
-              @keydown.escape="cancelEdit"
-            >
-              <option v-for="option in field.options" :key="option" :value="option">
-                {{ option }}
-              </option>
-            </select>
-            
-            <!-- Boolean Input -->
-            <select
-              v-else-if="field.type === 'boolean'"
-              :ref="el => fieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              class="field-input"
-              @blur="saveField(field.id)"
-              @keydown.enter="saveField(field.id)"
-              @keydown.escape="cancelEdit"
-            >
-              <option :value="true">Yes</option>
-              <option :value="false">No</option>
-            </select>
           </template>
           
           <template v-else>
@@ -141,73 +105,13 @@
           @click="startEditCustom(field.id)"
         >
           <template v-if="editingCustomField === field.id">
-            <!-- Text Input -->
-            <input
-              v-if="field.type === 'text'"
+            <q-input
               :ref="el => customFieldRefs[field.id] = el"
               v-model="editValues[field.id]"
-              type="text"
-              class="field-input"
-              @blur="saveCustomField(field.id)"
-              @keydown.enter="saveCustomField(field.id)"
-              @keydown.escape="cancelEditCustom"
-            />
-            
-            <!-- Number Input -->
-            <input
-              v-else-if="field.type === 'number'"
-              :ref="el => customFieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="number"
-              class="field-input"
-              @blur="saveCustomField(field.id)"
-              @keydown.enter="saveCustomField(field.id)"
-              @keydown.escape="cancelEditCustom"
-            />
-            
-            <!-- Email Input -->
-            <input
-              v-else-if="field.type === 'email'"
-              :ref="el => customFieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="email"
-              class="field-input"
-              @blur="saveCustomField(field.id)"
-              @keydown.enter="saveCustomField(field.id)"
-              @keydown.escape="cancelEditCustom"
-            />
-            
-            <!-- Phone Input -->
-            <input
-              v-else-if="field.type === 'tel'"
-              :ref="el => customFieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="tel"
-              class="field-input"
-              @blur="saveCustomField(field.id)"
-              @keydown.enter="saveCustomField(field.id)"
-              @keydown.escape="cancelEditCustom"
-            />
-            
-            <!-- Date Input -->
-            <input
-              v-else-if="field.type === 'date'"
-              :ref="el => customFieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="date"
-              class="field-input"
-              @blur="saveCustomField(field.id)"
-              @keydown.enter="saveCustomField(field.id)"
-              @keydown.escape="cancelEditCustom"
-            />
-            
-            <!-- URL Input -->
-            <input
-              v-else-if="field.type === 'url'"
-              :ref="el => customFieldRefs[field.id] = el"
-              v-model="editValues[field.id]"
-              type="url"
-              class="field-input"
+              :type="field.type === 'tel' ? 'tel' : (field.type === 'email' ? 'email' : (field.type === 'date' ? 'date' : (field.type === 'url' ? 'url' : (field.type === 'number' ? 'number' : 'text'))))"
+              dense
+              outlined
+              class="field-input-quasar"
               @blur="saveCustomField(field.id)"
               @keydown.enter="saveCustomField(field.id)"
               @keydown.escape="cancelEditCustom"
@@ -236,28 +140,35 @@
         </div>
         
         <div v-else class="add-field-form" data-test="add-field-form">
-          <div class="form-row">
-            <div class="form-field">
-              <label class="form-label">Field Name</label>
-              <input
+          <div class="form-row q-col-gutter-sm">
+            <div class="form-field col-8">
+              <q-input
                 v-model="newFieldLabel"
-                type="text"
-                class="form-input"
+                label="Field Name"
+                dense
+                outlined
                 placeholder="e.g., Phone Number"
                 data-test="field-label-input"
                 @keydown.enter="addCustomFieldHandler"
               />
             </div>
-            <div class="form-field">
-              <label class="form-label">Field Type</label>
-              <select v-model="newFieldType" class="form-select">
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-                <option value="email">Email</option>
-                <option value="tel">Phone</option>
-                <option value="date">Date</option>
-                <option value="url">URL</option>
-              </select>
+            <div class="form-field col-4">
+              <q-select
+                v-model="newFieldType"
+                :options="[
+                  {label: 'Text', value: 'text'},
+                  {label: 'Number', value: 'number'},
+                  {label: 'Email', value: 'email'},
+                  {label: 'Phone', value: 'tel'},
+                  {label: 'Date', value: 'date'},
+                  {label: 'URL', value: 'url'}
+                ]"
+                label="Field Type"
+                dense
+                outlined
+                emit-value
+                map-options
+              />
             </div>
           </div>
           <div class="form-actions">
@@ -566,8 +477,8 @@ const cancelEditCustom = () => {
 
 <style scoped>
 .generic-detail-panel {
-  background: #fafafa;
-  border-left: 3px solid #3b82f6;
+  background: var(--q-grey-1);
+  border-left: 3px solid var(--q-primary);
   padding: 12px 16px;
   max-width: 800px;
 }
@@ -578,7 +489,7 @@ const cancelEditCustom = () => {
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--q-grey-3);
 }
 
 .record-info {

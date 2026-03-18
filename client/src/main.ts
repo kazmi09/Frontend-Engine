@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { Quasar, Notify } from 'quasar'
+import { Quasar, Notify, Dialog, Loading } from 'quasar'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { createPinia } from 'pinia'
 import router from './router'
@@ -24,7 +24,9 @@ app.use(pinia)
 app.use(router)
 app.use(Quasar, {
   plugins: {
-    Notify
+    Notify,
+    Dialog,
+    Loading
   }
 })
 app.use(VueQueryPlugin, { queryClient })
