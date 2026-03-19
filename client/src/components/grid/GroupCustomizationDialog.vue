@@ -65,7 +65,7 @@
               :rules="[val => !val || /^#[0-9A-F]{6}$/i.test(val) || 'Invalid hex color']"
             >
               <template v-slot:append>
-                <q-icon name="colorize" class="cursor-pointer" />
+                <q-icon name="colorize" class="tw:cursor-pointer" />
                 <q-popup-proxy cover transition-show="scale" transition-hide="scale">
                   <q-color
                     v-model="localColor"

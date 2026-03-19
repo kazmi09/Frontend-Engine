@@ -21,18 +21,18 @@
           <thead>
             <tr>
               <!-- Checkbox column skeleton -->
-              <th class="text-left" style="width: 50px">
+              <th class="tw:text-left" style="width: 50px">
                 <q-skeleton type="QCheckbox" animation="wave" />
               </th>
               <!-- Expander column skeleton if expandable -->
-              <th v-if="props.data?.expandable" class="text-left" style="width: 50px">
+              <th v-if="props.data?.expandable" class="tw:text-left" style="width: 50px">
                 <q-skeleton type="rect" width="24px" height="24px" animation="wave" />
               </th>
               <!-- Dynamic column skeletons based on actual columns -->
               <th 
                 v-for="(col, i) in (props.data?.columns || defaultSkeletonColumns)" 
                 :key="i" 
-                class="text-left"
+                class="tw:text-left"
               >
                 <q-skeleton type="text" animation="wave" />
               </th>

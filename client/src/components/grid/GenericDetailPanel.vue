@@ -7,8 +7,8 @@
           <q-icon :name="config.icon || 'description'" size="md" />
         </div>
         <div>
-          <h3 class="record-title">{{ getRecordTitle() }}</h3>
-          <p class="record-subtitle">{{ getRecordSubtitle() }}</p>
+          <div class="text-h6 record-title">{{ getRecordTitle() }}</div>
+          <div class="text-caption record-subtitle">{{ getRecordSubtitle() }}</div>
         </div>
       </div>
       <div class="record-id" v-if="config.showId !== false">
