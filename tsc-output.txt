@@ -1,0 +1,50 @@
+﻿client/src/components/grid/BulkActionsBar.vue(39,23): error TS2339: Property 'isLoading' does not exist on type '{ selectedCount: number; clearSelection: () => void; openBulkEditDialog: () => void; exportSelected: () => Promise<void>; archiveSelected: () => Promise<void>; confirmDelete: () => void; ... 44 more ...; $router: Router; }'.
+client/src/components/grid/BulkActionsBar.vue(49,23): error TS2339: Property 'isExporting' does not exist on type '{ selectedCount: number; clearSelection: () => void; openBulkEditDialog: () => void; exportSelected: () => Promise<void>; archiveSelected: () => Promise<void>; confirmDelete: () => void; ... 44 more ...; $router: Router; }'.
+client/src/components/grid/BulkActionsBar.vue(59,23): error TS2339: Property 'isArchiving' does not exist on type '{ selectedCount: number; clearSelection: () => void; openBulkEditDialog: () => void; exportSelected: () => Promise<void>; archiveSelected: () => Promise<void>; confirmDelete: () => void; ... 44 more ...; $router: Router; }'.
+client/src/components/grid/BulkActionsBar.vue(69,23): error TS2339: Property 'isDeleting' does not exist on type '{ selectedCount: number; clearSelection: () => void; openBulkEditDialog: () => void; exportSelected: () => Promise<void>; archiveSelected: () => Promise<void>; confirmDelete: () => void; ... 44 more ...; $router: Router; }'.
+client/src/components/grid/BulkActionsBar.vue(104,21): error TS2339: Property 'isDeleting' does not exist on type '{ selectedCount: number; clearSelection: () => void; openBulkEditDialog: () => void; exportSelected: () => Promise<void>; archiveSelected: () => Promise<void>; confirmDelete: () => void; ... 44 more ...; $router: Router; }'.
+client/src/components/grid/BulkActionsBar.vue(120,23): error TS2304: Cannot find name 'BulkActionsConfig'.
+client/src/components/grid/BulkActionsBar.vue(130,75): error TS2304: Cannot find name 'CustomBulkAction'.
+client/src/components/grid/BulkActionsBar.vue(143,33): error TS2304: Cannot find name 'CustomBulkAction'.
+client/src/components/grid/BulkActionsBar.vue(213,37): error TS2304: Cannot find name 'CustomBulkAction'.
+client/src/components/grid/cells/DetailPanel.vue(104,49): error TS2349: This expression is not callable.
+  Type 'Boolean' has no call signatures.
+client/src/components/grid/cells/EditableCell.vue(201,20): error TS2339: Property 'validator' does not exist on type 'ColumnConfig'.
+client/src/components/grid/cells/EditableCell.vue(202,25): error TS2339: Property 'validator' does not exist on type 'ColumnConfig'.
+client/src/components/grid/cells/editors/DateEdit.vue(9,6): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+client/src/components/grid/cells/editors/NumberEdit.vue(9,6): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+client/src/components/grid/cells/editors/SelectEdit.vue(11,6): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+client/src/components/grid/cells/editors/StringEdit.vue(8,6): error TS2322: Type 'string | null | undefined' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+client/src/components/grid/DataGrid.vue(57,20): error TS2322: Type 'string' is not assignable to type '"QAvatar" | "QBadge" | "QBtn" | "QCheckbox" | "QChip" | "QInput" | "QRadio" | "QRange" | "QSlider" | "QToggle" | "QToolbar" | "circle" | "rect" | "text" | undefined'.
+client/src/components/grid/DataGrid.vue(119,69): error TS2345: Argument of type 'Event' is not assignable to parameter of type 'MouseEvent'.
+  Type 'Event' is missing the following properties from type 'MouseEvent': altKey, button, buttons, clientX, and 23 more.
+client/src/components/grid/DataGrid.vue(127,68): error TS2345: Argument of type 'Event' is not assignable to parameter of type 'MouseEvent'.
+  Type 'Event' is missing the following properties from type 'MouseEvent': altKey, button, buttons, clientX, and 23 more.
+client/src/components/grid/DataGrid.vue(193,20): error TS2322: Type 'string | number | boolean | (string | number | boolean)[]' is not assignable to type 'string | number | FileList | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | FileList | null | undefined'.
+client/src/components/grid/DataGrid.vue(208,20): error TS2322: Type 'string | number | boolean | (string | number | boolean)[]' is not assignable to type 'string | number | FileList | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | FileList | null | undefined'.
+client/src/components/grid/DataGrid.vue(303,30): error TS2322: Type 'ColumnDefTemplate<HeaderContext<any, unknown>>' is not assignable to type 'string'.
+  Type '(props: HeaderContext<any, unknown>) => any' is not assignable to type 'string'.
+client/src/components/grid/DataGrid.vue(437,20): error TS2322: Type 'string' is not assignable to type '"QAvatar" | "QBadge" | "QBtn" | "QCheckbox" | "QChip" | "QInput" | "QRadio" | "QRange" | "QSlider" | "QToggle" | "QToolbar" | "circle" | "rect" | "text" | undefined'.
+client/src/components/grid/DataGrid.vue(462,35): error TS2339: Property 'bulkActionsConfig' does not exist on type 'DefineProps<LooseRequired<__VLS_Props>, "isLoading" | "hasNextPage" | "isFetchingNext">'.
+client/src/components/grid/DataGrid.vue(469,23): error TS2551: Property 'handleCustomAction' does not exist on type '{ table: Table<any>; rowVirtualizer: Virtualizer<HTMLDivElement, Element>; defaultSkeletonColumns: any[]; skeletonRowCount: number; ... 92 more ...; $router: Router; }'. Did you mean 'handleSaveCustomization'?
+client/src/components/grid/DataGrid.vue(621,9): error TS2322: Type '{ id: string; accessorKey: string; header: string; size: number; minSize: number; maxSize: number; enableSorting: true; enableHiding: true; enableGrouping: true; enableColumnFilter: true; filterFn: (row: any, columnId: string, filterValue: any) => boolean; aggregationFn: string | undefined; aggregatedCell: ({ getVal...' is not assignable to type 'ColumnDef<any>[]'.
+  Type '{ id: string; accessorKey: string; header: string; size: number; minSize: number; maxSize: number; enableSorting: true; enableHiding: true; enableGrouping: true; enableColumnFilter: true; filterFn: (row: any, columnId: string, filterValue: any) => boolean; aggregationFn: string | undefined; aggregatedCell: ({ getVal...' is not assignable to type 'ColumnDef<any>'.
+    Type '{ id: string; accessorKey: string; header: string; size: number; minSize: number; maxSize: number; enableSorting: true; enableHiding: true; enableGrouping: true; enableColumnFilter: true; filterFn: (row: any, columnId: string, filterValue: any) => boolean; aggregationFn: string | undefined; aggregatedCell: ({ getVal...' is not assignable to type 'AccessorKeyColumnDefBase<any, unknown> & Partial<IdIdentifier<any, unknown>>'.
+      Type '{ id: string; accessorKey: string; header: string; size: number; minSize: number; maxSize: number; enableSorting: true; enableHiding: true; enableGrouping: true; enableColumnFilter: true; filterFn: (row: any, columnId: string, filterValue: any) => boolean; aggregationFn: string | undefined; aggregatedCell: ({ getVal...' is not assignable to type 'AccessorKeyColumnDefBase<any, unknown>'.
+        Types of property 'aggregationFn' are incompatible.
+          Type 'string | undefined' is not assignable to type 'AggregationFnOption<any> | undefined'.
+            Type 'string' is not assignable to type 'AggregationFnOption<any> | undefined'.
+client/src/components/grid/DataGrid.vue(888,48): error TS2339: Property 'getVirtualItems' does not exist on type 'Ref<Virtualizer<HTMLDivElement, Element>, Virtualizer<HTMLDivElement, Element>>'.
+client/src/components/grid/DataGrid.vue(892,39): error TS2339: Property 'getVirtualItems' does not exist on type 'Ref<Virtualizer<HTMLDivElement, Element>, Virtualizer<HTMLDivElement, Element>>'.
+client/src/components/grid/DataGrid.vue(993,47): error TS2339: Property 'getVirtualItems' does not exist on type 'Ref<Virtualizer<HTMLDivElement, Element>, Virtualizer<HTMLDivElement, Element>>'.
+client/src/components/grid/DataGrid.vue(994,27): error TS2339: Property 'getVirtualItems' does not exist on type 'Ref<Virtualizer<HTMLDivElement, Element>, Virtualizer<HTMLDivElement, Element>>'.
+client/src/components/grid/DataGrid.vue(1347,48): error TS2349: This expression is not callable.
+  Type 'Boolean' has no call signatures.
+client/src/components/grid/DataGrid.vue(1528,29): error TS2345: Argument of type 'boolean' is not assignable to parameter of type 'string[]'.
+server/generic-grid-service.ts(41,7): error TS2353: Object literal may only specify known properties, and 'gridId' does not exist in type 'DataResult'.
