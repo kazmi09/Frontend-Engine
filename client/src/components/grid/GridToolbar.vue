@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white dark:bg-dark q-px-sm q-py-xs tw:border-b flex items-center justify-between gap-3 tw:flex-none tw:min-h-[48px]">
+  <div class="tw:bg-white dark:tw:bg-dark q-px-sm q-py-xs tw:border-b tw:flex tw:items-center tw:justify-between tw:gap-3 tw:flex-none tw:min-h-[48px]">
     <!-- Left side: Search and Filter -->
     <div class="tw:flex tw:items-center tw:gap-3 tw:flex-1 tw:min-w-0 tw:flex-wrap">
       <!-- Search Input -->

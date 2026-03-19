@@ -1,5 +1,5 @@
 <template>
-  <span class="text-sm">{{ displayValue }}</span>
+  <span class="tw:text-sm">{{ displayValue }}</span>
 </template>
 
 <script setup lang="ts">

@@ -7,7 +7,7 @@
     :error="!!error"
     :error-message="error"
     class="clean-input"
-    input-class="text-sm"
+    input-class="tw:text-sm"
     @blur="$emit('save')"
     @keydown.enter.prevent="$emit('save')"
     @keydown.escape="$emit('cancel')"

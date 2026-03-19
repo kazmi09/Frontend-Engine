@@ -16,7 +16,7 @@
       class="tw:flex-1 tw:overflow-auto tw:border tw:border-gray-200 dark:tw:border-gray-700 tw:rounded-lg tw:bg-white tw:relative tw:mx-2 tw:mb-2"
     >
       <!-- Enhanced Skeleton Loading with Quasar Components -->
-      <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="w-full">
+      <div v-if="isLoading && (!props.data?.rows || props.data.rows.length === 0)" class="tw:w-full">
         <q-markup-table flat bordered class="skeleton-table">
           <thead>
             <tr>
@@ -453,7 +453,7 @@
     </div>
 
     <!-- Status Bar -->
-    <div class="tw:flex-none q-py-xs q-px-sm tw:border-t flex items-center justify-between text-caption text-grey-7 bg-white dark:bg-dark">
+    <div class="tw:flex-none q-py-xs q-px-sm tw:border-t tw:flex tw:items-center tw:justify-between text-caption text-grey-7 tw:bg-white dark:tw:bg-dark">
       <span>{{ totalRows.toLocaleString() }} total rows{{ props.isFetchingNext ? ' · Loading more...' : (props.hasNextPage ? ' · Scroll to load more' : '') }}</span>
       <span v-if="selectedCount > 0" class="text-primary text-weight-medium">{{ selectedCount }} selected</span>
     </div>

@@ -14,14 +14,14 @@
           icon="group"
           label="Users"
           @click="$router.push('/grid/users')"
-          :class="$route.path.includes('/users') ? 'bg-white text-primary' : ''"
+          :class="$route.path.includes('/users') ? 'tw:bg-white tw:text-primary' : ''"
         />
         <q-btn
           flat
           icon="inventory_2"
           label="Products"
           @click="$router.push('/grid/products')"
-          :class="$route.path.includes('/products') ? 'bg-white text-primary' : ''"
+          :class="$route.path.includes('/products') ? 'tw:bg-white tw:text-primary' : ''"
         />
       </q-toolbar>
     </q-header>

@@ -1,5 +1,5 @@
 <template>
-  <span class="text-sm font-mono text-right">{{ displayValue }}</span>
+  <span class="tw:text-sm tw:font-mono tw:text-right">{{ displayValue }}</span>
 </template>
 
 <script setup lang="ts">

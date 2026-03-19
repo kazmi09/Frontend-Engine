@@ -9,19 +9,19 @@
         <!-- Loading State -->
         <div v-if="isLoading" class="detail-panel-loading">
           <q-spinner-dots size="40px" color="primary" />
-          <span class="text-sm text-grey-7 mt-2">Loading details...</span>
+          <span class="tw:text-sm text-grey-7 tw:mt-2">Loading details...</span>
         </div>
         
         <!-- Error State -->
         <div v-else-if="error" class="detail-panel-error">
           <q-icon name="error" size="md" color="negative" />
-          <span class="text-sm text-negative">{{ error }}</span>
+          <span class="tw:text-sm text-negative">{{ error }}</span>
           <q-btn 
             flat 
             size="sm" 
             label="Retry" 
             @click="handleRetry"
-            class="mt-2"
+            class="tw:mt-2"
           />
         </div>
         

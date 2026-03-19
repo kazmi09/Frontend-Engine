@@ -9,9 +9,9 @@
       </q-card-section>
 
       <q-card-section class="q-pt-none">
-        <div class="grid grid-cols-1 gap-4">
-          <div v-for="column in columns" :key="column.id" class="flex flex-col gap-2">
-            <label class="text-sm font-medium text-gray-700">
+        <div class="tw:grid tw:grid-cols-1 tw:gap-4">
+          <div v-for="column in columns" :key="column.id" class="tw:flex tw:flex-col tw:gap-2">
+            <label class="tw:text-sm tw:font-medium tw:text-gray-700">
               {{ column.label }}
             </label>
             

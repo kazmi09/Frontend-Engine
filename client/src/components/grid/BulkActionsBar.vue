@@ -1,17 +1,17 @@
 <template>
   <div 
     v-if="selectedCount > 0"
-    class="fixed-bottom bg-white dark:bg-dark border-top shadow-up-5 transition-transform duration-300 ease-in-out"
-    :class="selectedCount > 0 ? 'translate-y-0' : 'translate-y-full'"
+    class="fixed-bottom tw:bg-white dark:tw:bg-dark border-top shadow-up-5 tw:transition-transform tw:duration-300 tw:ease-in-out"
+    :class="selectedCount > 0 ? 'tw:translate-y-0' : 'tw:translate-y-full'"
     style="z-index: 9999;"
   >
-    <div class="max-w-7xl mx-auto px-4 py-3">
-      <div class="flex items-center justify-between">
+    <div class="tw:max-w-7xl tw:mx-auto tw:px-4 tw:py-3">
+      <div class="tw:flex tw:items-center tw:justify-between">
         <!-- Selection Info -->
-        <div class="flex items-center gap-4">
-          <div class="flex items-center gap-2">
+        <div class="tw:flex tw:items-center tw:gap-4">
+          <div class="tw:flex tw:items-center tw:gap-2">
             <q-icon name="check_circle" color="primary" />
-            <span class="text-sm font-medium text-grey-9">
+            <span class="tw:text-sm tw:font-medium text-grey-9">
               {{ selectedCount }} {{ selectedCount === 1 ? (displayName || 'item') : (displayNamePlural || 'items') }} selected
             </span>
           </div>
@@ -22,14 +22,14 @@
             size="sm"
             icon="close"
             @click="clearSelection"
-            class="text-gray-500 hover:text-gray-700"
+            class="tw:text-gray-500 hover:tw:text-gray-700"
           >
             <q-tooltip>Clear selection</q-tooltip>
           </q-btn>
         </div>
 
         <!-- Bulk Actions -->
-        <div class="flex items-center gap-2">
+        <div class="tw:flex tw:items-center tw:gap-2">
           <q-btn
             outline
             size="sm"

@@ -1,11 +1,11 @@
 <template>
-  <div class="flex items-center">
+  <div class="tw:flex tw:items-center">
     <q-icon 
-      :name="displayValue ? 'check_circle' : 'cancel'"
-      :color="displayValue ? 'positive' : 'negative'"
-      size="sm"
+      :name="value ? 'check_circle' : 'cancel'"
+      :color="value ? 'positive' : 'negative'"
+      size="xs"
     />
-    <span class="ml-2 text-sm">{{ displayValue ? 'Yes' : 'No' }}</span>
+    <span class="tw:ml-2 tw:text-sm">{{ displayValue ? 'Yes' : 'No' }}</span>
   </div>
 </template>
 
