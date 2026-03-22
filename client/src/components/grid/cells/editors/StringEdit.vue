@@ -6,6 +6,7 @@
     borderless
     :error="!!error"
     :error-message="error"
+    hide-bottom-space
     class="clean-input"
     input-class="tw:text-sm"
     @blur="$emit('save')"
@@ -47,7 +48,8 @@ onMounted(() => {
 .clean-input
   :deep(.q-field__control)
     padding: 0 8px
-    min-height: 36px
+    min-height: 32px
+    height: 32px
     
   :deep(.q-field__native)
     padding: 0

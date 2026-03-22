@@ -309,11 +309,11 @@ const handleExport = async (selectedIds: string[]) => {
     background-color: #f5f5f5
     
   :deep(th)
-    padding: 12px 16px
+    padding: 8px 16px
     font-weight: 500
     
   :deep(td)
-    padding: 12px 16px
+    padding: 8px 16px
     
   :deep(tbody tr)
     transition: background-color 0.2s

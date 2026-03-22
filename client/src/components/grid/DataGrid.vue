@@ -355,7 +355,7 @@
                       maxWidth: `${cell.column.getSize()}px`,
                       paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
                     }"
-                    class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-sm tw:overflow-hidden"
+                    class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1 tw:text-sm tw:overflow-hidden"
                   >
                     <!-- Expander Cell -->
                     <ExpanderCell
@@ -1766,11 +1766,11 @@ const handleResetCustomization = (groupColumn: string, groupValue: any) => {
     background-color: #f5f5f5
     
   :deep(th)
-    padding: 12px 16px
+    padding: 8px 16px
     font-weight: 500
     
   :deep(td)
-    padding: 12px 16px
+    padding: 8px 16px
     
   :deep(tbody tr)
     transition: background-color 0.2s
@@ -1827,8 +1827,8 @@ table
   min-width: 100%
   
   tbody tr
-    // Fixed row height prevents shaking
-    height: 53px
+    // Compact row height to match 32px inputs + padding
+    height: 40px
     // Prevent content from causing layout shifts
     contain: layout style paint
     // Hardware acceleration
@@ -1839,9 +1839,9 @@ table
     overflow: hidden
     text-overflow: ellipsis
     white-space: nowrap
-    // Fixed height to prevent jumping
-    height: 53px
-    max-height: 53px
+    // Compact height to match 32px inputs + padding
+    height: 40px
+    max-height: 40px
     box-sizing: border-box
 
 // Group header row styles
@@ -1876,7 +1876,7 @@ table
   align-items: center
 
 .group-header-cell
-  padding: 0.875rem 1rem
+  padding: 0.5rem 1rem
   border-bottom: 2px solid #e5e7eb
 
 .group-expand-icon
@@ -1959,12 +1959,12 @@ table
 
   .inline-filter-input, .inline-filter-select
     :deep(.q-field__control)
-      min-height: 28px
-      height: 28px
+      min-height: 32px
+      height: 32px
       font-size: 12px
 
     :deep(.q-field__marginal)
-      height: 28px
+      height: 32px
 
     :deep(.q-field__native)
       padding: 0 4px

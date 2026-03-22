@@ -154,3 +154,10 @@ watch(() => props.modelValue, (isOpen) => {
   }
 })
 </script>
+
+<style lang="sass" scoped>
+.q-input, .q-select
+  :deep(.q-field__control)
+    min-height: 32px
+    height: 32px
+</style>

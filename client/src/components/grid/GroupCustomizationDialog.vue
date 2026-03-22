@@ -232,15 +232,18 @@ const handleReset = () => {
 }
 </script>
 
-<style scoped>
-.color-preset-btn {
-  border-radius: 4px;
-  border: 2px solid transparent;
-  transition: all 0.2s ease;
-}
+<style lang="sass" scoped>
+.color-preset-btn
+  border-radius: 4px
+  border: 2px solid transparent
+  transition: all 0.2s ease
 
-.color-preset-btn:hover {
-  border-color: #1976d2;
-  transform: scale(1.1);
-}
+.color-preset-btn:hover
+  border-color: #1976d2
+  transform: scale(1.1)
+
+.q-input:not([type="textarea"])
+  :deep(.q-field__control)
+    min-height: 32px
+    height: 32px
 </style>

@@ -248,10 +248,11 @@ const onCancel = () => {
   transition: all 0.2s ease
 
 .editing
-  background-color: rgba(25, 118, 210, 0.05)
-  border: 2px solid #1976d2
+  background-color: rgba(25, 118, 210, 0.03)
+  outline: 1px solid var(--q-primary)
+  outline-offset: -1px
   border-radius: 4px
-  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1)
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1)
 
 .edit-mode-container
   padding: 0

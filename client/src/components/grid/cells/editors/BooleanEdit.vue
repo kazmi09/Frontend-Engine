@@ -1,7 +1,9 @@
 <template>
   <q-toggle
     v-model="localValue"
+    dense
     :label="localValue ? 'Yes' : 'No'"
+    class="boolean-editor"
     @update:model-value="handleChange"
   />
 </template>
@@ -34,3 +36,11 @@ const handleChange = () => {
   emit('save')
 }
 </script>
+
+<style lang="sass" scoped>
+.boolean-editor
+  min-height: 32px
+  height: 32px
+  display: flex
+  align-items: center
+</style>

@@ -4,11 +4,13 @@
     v-model="localValue"
     :options="options"
     dense
-    outlined
+    borderless
     emit-value
     map-options
     :error="!!error"
     :error-message="error"
+    hide-bottom-space
+    class="clean-input"
     @blur="$emit('save')"
     @keydown.enter="$emit('save')"
     @keydown.escape="$emit('cancel')"
@@ -50,3 +52,21 @@ onMounted(() => {
   selectRef.value?.focus()
 })
 </script>
+
+<style lang="sass" scoped>
+.clean-input
+  :deep(.q-field__control)
+    padding: 0 8px
+    min-height: 32px
+    height: 32px
+    
+  :deep(.q-field__native)
+    padding: 0
+    font-size: 0.875rem
+    
+  :deep(.q-field__control:before)
+    border: none
+    
+  :deep(.q-field__control:after)
+    border: none
+</style>
