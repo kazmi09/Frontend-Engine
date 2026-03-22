@@ -492,6 +492,49 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
         }
       ]
     }
+  },
+
+  // High-volume mock API for stress testing and demonstrating dataset agnosticism
+  'stress-test': {
+    id: 'stress-test',
+    name: 'Stress Test (100k Rows)',
+    description: 'High-volume system audit logs (100,000 rows)',
+    icon: 'speed',
+    displayName: 'log entry',
+    displayNamePlural: 'log entries',
+    dataSource: {
+      type: 'api',
+      api: {
+        baseUrl: 'http://localhost:5000', // Local API
+        endpoints: {
+          list: '/api/mock/stress-test',
+        }
+      }
+    },
+    columns: [
+      { id: 'id', label: 'ID', type: 'number', width: 100, pinned: 'left' },
+      { id: 'timestamp', label: 'Timestamp', type: 'date', width: 200, editable: false },
+      { id: 'level', label: 'Level', type: 'select', options: ['info', 'warn', 'error', 'debug'], width: 100 },
+      { id: 'component', label: 'Component', type: 'string', width: 150 },
+      { id: 'action', label: 'Action', type: 'string', width: 180 },
+      { id: 'user', label: 'User', type: 'string', width: 120 },
+      { id: 'ipAddress', label: 'IP Address', type: 'string', width: 150 },
+      { id: 'status', label: 'Status', type: 'number', width: 100 },
+      { id: 'responseTime', label: 'Response (ms)', type: 'number', width: 130 },
+    ],
+    pagination: {
+      enabled: true,
+      defaultPageSize: 100,
+      pageSizeOptions: [50, 100, 500, 1000]
+    },
+    search: {
+      enabled: true,
+      searchableColumns: ['component', 'action', 'user', 'ipAddress']
+    },
+    filters: {
+      enabled: true,
+      filterableColumns: ['level', 'component', 'status']
+    }
   }
 }
 

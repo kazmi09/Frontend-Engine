@@ -5,8 +5,8 @@ export interface QueryParams {
   pageIndex?: number
   pageSize?: number
   searchText?: string
-  filterBy?: string
-  sortBy?: Array<{ id: string; desc: boolean }>
+  filterBy?: Record<string, any>
+  sorting?: Array<{ id: string; desc: boolean }>
 }
 
 export interface QueryResult {
@@ -46,11 +46,11 @@ export class GenericQueryBuilder {
       pageIndex = 0,
       pageSize = 20,
       searchText = '',
-      filterBy = '',
-      sortBy = []
+      filterBy = {} as Record<string, any>,
+      sorting = []
     } = params
 
-    const limit = Math.min(pageSize, 50000) // Allow up to 50k rows for "All" option
+    const limit = Math.min(pageSize, 1000000) // Allow up to 1M rows for "All" option
     const offset = pageIndex * limit
     
     console.log('[GenericQueryBuilder] Query params:', { pageIndex, pageSize, limit, offset, searchText, filterBy })
@@ -61,23 +61,29 @@ export class GenericQueryBuilder {
 
     if (searchText && this.config.search?.enabled) {
       const searchableColumns = this.config.search.searchableColumns || []
-      
-      if (filterBy && searchableColumns.includes(filterBy)) {
-        // Filter by specific column
-        whereClause = `WHERE ${filterBy} LIKE ?`
-        queryParams.push(`%${searchText}%`)
-      } else if (searchableColumns.length > 0) {
-        // Search across all searchable columns
+      if (searchableColumns.length > 0) {
         const conditions = searchableColumns.map(col => `${col} LIKE ?`)
         whereClause = `WHERE (${conditions.join(' OR ')})`
         searchableColumns.forEach(() => queryParams.push(`%${searchText}%`))
       }
     }
 
+    if (filterBy && Object.keys(filterBy).length > 0) {
+      const filterConditions = Object.entries(filterBy).map(([col, val]) => {
+        queryParams.push(`%${val}%`)
+        return `${col} LIKE ?`
+      })
+      if (whereClause) {
+        whereClause += ` AND ${filterConditions.join(' AND ')}`
+      } else {
+        whereClause = `WHERE ${filterConditions.join(' AND ')}`
+      }
+    }
+
     // Build ORDER BY clause
     let orderByClause = ''
-    if (sortBy.length > 0) {
-      const sortConditions = sortBy.map(sort => `${sort.id} ${sort.desc ? 'DESC' : 'ASC'}`)
+    if (sorting && sorting.length > 0) {
+      const sortConditions = sorting.map((sort: any) => `${sort.id} ${sort.desc ? 'DESC' : 'ASC'}`)
       orderByClause = `ORDER BY ${sortConditions.join(', ')}`
     } else {
       orderByClause = `ORDER BY ${connection.primaryKey} DESC`
@@ -137,95 +143,89 @@ export class GenericQueryBuilder {
     const {
       pageIndex = 0,
       pageSize = 20,
-      searchText = ''
+      searchText = '',
+      filterBy = {} as Record<string, any>
     } = params
 
-    // Build URL with pagination parameters
-    let url = `${api.baseUrl}${api.endpoints.list}`
-    const urlParams = new URLSearchParams()
-    
-    // DummyJSON uses limit and skip for pagination
-    urlParams.append('limit', pageSize.toString())
-    urlParams.append('skip', (pageIndex * pageSize).toString())
-    
-    // Add search if supported
-    if (searchText && this.config.search?.enabled) {
-      // For DummyJSON, we'll fetch all data and filter client-side
-      // since their search API is limited
-      urlParams.delete('limit')
-      urlParams.delete('skip')
-      urlParams.append('limit', '0') // Get all data for client-side filtering
-    }
-    
-    url += `?${urlParams.toString()}`
+    const requestedSkip = pageIndex * pageSize
+    const targetLimit = pageSize
 
-    // Fetch data from API
-    const response = await fetch(url, {
+    // If searching, we skip the virtual pagination for now and let the API handle it
+    let endpoint = api.endpoints.list
+    if (searchText && this.config.search?.enabled) {
+      endpoint = api.endpoints.list.includes('?') ? `${api.endpoints.list}&q=${searchText}` : `${api.endpoints.list}/search?q=${searchText}`
+    } else if (filterBy && Object.keys(filterBy).length > 0) {
+      const filterKey = Object.keys(filterBy)[0]
+      const filterValue = filterBy[filterKey]
+      endpoint = `/filter?key=${filterKey}&value=${filterValue}`
+    }
+
+    let apiSkip = requestedSkip
+    let response = await fetch(`${api.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
       headers: api.headers || {}
     })
+
+    if (!response.ok && (searchText || Object.keys(filterBy).length > 0)) {
+      // Fallback if search/filter endpoint didn't work as expected
+      response = await fetch(`${api.baseUrl}${api.endpoints.list}${api.endpoints.list.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
+        headers: api.headers || {}
+      })
+    }
 
     if (!response.ok) {
       throw new Error(`API request failed: ${response.statusText}`)
     }
 
     let responseData = await response.json()
+    
+    // Dynamically find the data array
+    let listKey = ''
     let allData: any[] = []
-    let totalRows = 0
+    
+    for (const key in responseData) {
+      if (Array.isArray(responseData[key])) {
+        listKey = key
+        allData = responseData[key]
+        break
+      }
+    }
 
-    // Handle different API response formats
-    if (responseData.users) {
-      // DummyJSON format: { users: [...], total: 208, skip: 0, limit: 30 }
-      allData = responseData.users
-      totalRows = responseData.total || allData.length
-    } else if (Array.isArray(responseData)) {
-      // Simple array format
+    if (!listKey && !Array.isArray(responseData)) {
+      throw new Error('Unsupported API response format. Could not find data array.')
+    }
+
+    if (Array.isArray(responseData)) {
       allData = responseData
-      totalRows = allData.length
-    } else {
-      throw new Error('Unsupported API response format')
     }
 
-    // Client-side filtering for search
-    if (searchText && this.config.search?.enabled) {
-      const searchableColumns = this.config.search.searchableColumns || []
-      allData = allData.filter((item: any) => {
-        return searchableColumns.some(col => {
-          const value = item[col]
-          return value && value.toString().toLowerCase().includes(searchText.toLowerCase())
-        })
+    let apiTotal = responseData.total || responseData.totalRows || responseData.count || allData.length
+    
+    // Virtual inflation logic
+    const TARGET_VOLUME = 100000
+    if (requestedSkip >= apiTotal && apiTotal > 0 && !searchText) {
+      apiSkip = requestedSkip % apiTotal
+      
+      const retryResponse = await fetch(`${api.baseUrl}${api.endpoints.list}${api.endpoints.list.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
+        headers: api.headers || {}
       })
-      totalRows = allData.length
+      
+      if (retryResponse.ok) {
+        const retryData = await retryResponse.json()
+        allData = retryData[listKey] || (Array.isArray(retryData) ? retryData : [])
+      }
     }
 
-    // Multiply dataset for testing (gives enough rows to demo infinite scroll)
-    const MULTIPLIER = 5
-    const baseData = [...allData]
-    for (let i = 1; i < MULTIPLIER; i++) {
-      allData = allData.concat(baseData.map((item: any) => ({
-        ...item,
-        id: item.id + (i * 10000) // Ensure unique IDs across copies
-      })))
-    }
-    totalRows = allData.length
+    // Adjust IDs for uniqueness
+    const virtualPageOffset = Math.floor(requestedSkip / (apiTotal || 1))
+    const processedRows = allData.map((item: any) => ({
+      ...item,
+      id: item.id ? (typeof item.id === 'number' ? item.id + (virtualPageOffset * 1000000) : `${item.id}-${virtualPageOffset}`) : `row-${requestedSkip}-${Math.random()}`
+    }))
 
-    // Client-side pagination (if we fetched all data for search)
-    let paginatedData = allData
-    if (searchText || !responseData.users) {
-      const startIndex = pageIndex * pageSize
-      const endIndex = startIndex + pageSize
-      paginatedData = allData.slice(startIndex, endIndex)
-    } else {
-      // For normal paginated requests, slice from the multiplied set
-      const startIndex = pageIndex * pageSize
-      const endIndex = startIndex + pageSize
-      paginatedData = allData.slice(startIndex, endIndex)
-    }
+    const totalRows = searchText ? apiTotal : Math.max(apiTotal, TARGET_VOLUME)
 
     return {
-      rows: paginatedData.map((row: any) => ({ 
-        ...row, 
-        id: row.id || row.pk_id || `row-${Math.random()}` 
-      })),
+      rows: processedRows,
       totalRows,
       pageIndex,
       pageSize

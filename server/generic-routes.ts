@@ -1,6 +1,7 @@
-import type { Express } from "express";
+import type { Express } from "express"
 import { GenericGridService } from './generic-grid-service'
 import { getGridConfig, getAllGridConfigs } from '../shared/grid-config'
+import { MockDataService } from './mock-data-service'
 
 export function registerGenericGridRoutes(app: Express) {
   
@@ -55,17 +56,23 @@ export function registerGenericGridRoutes(app: Express) {
       const { gridId } = req.params
       
       // Parse query parameters
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50000)
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 1000000)
       const offset = parseInt(req.query.offset as string) || 0
       const pageIndex = Math.floor(offset / limit)
       const searchText = (req.query.search as string) || ""
-      const filterBy = (req.query.filterBy as string) || ""
+      const filterByStr = (req.query.filterBy as string) || "{}"
+      let filterBy: Record<string, any> = {}
+      try {
+        filterBy = JSON.parse(filterByStr)
+      } catch (e) {
+        // Fallback or handle if not JSON
+      }
       
       // Parse sorting
-      let sortBy: Array<{ id: string; desc: boolean }> = []
+      let sorting: Array<{ id: string; desc: boolean }> = []
       if (req.query.sortBy) {
         try {
-          sortBy = JSON.parse(req.query.sortBy as string)
+          sorting = JSON.parse(req.query.sortBy as string)
         } catch (e) {
           // Invalid sort format, ignore
         }
@@ -77,7 +84,7 @@ export function registerGenericGridRoutes(app: Express) {
         pageSize: limit,
         searchText,
         filterBy,
-        sortBy
+        sorting
       })
       
       res.json(result)
@@ -209,5 +216,15 @@ export function registerGenericGridRoutes(app: Express) {
         message: error.message 
       })
     }
+  })
+
+  // Mock stress test API for demonstration
+  app.get("/api/mock/stress-test", (req, res) => {
+    const limit = parseInt(req.query.limit as string) || 50
+    const skip = parseInt(req.query.skip as string) || 0
+    const search = req.query.q as string
+    
+    const result = MockDataService.getAuditLogs(skip, limit, search)
+    res.json(result)
   })
 }
