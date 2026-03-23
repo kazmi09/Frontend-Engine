@@ -84,8 +84,9 @@
                 'tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-left tw:text-xs tw:font-medium tw:text-gray-500 tw:uppercase tw:tracking-wider tw:relative',
                 {
                   'tw:cursor-move': header.id !== 'select' && header.id !== 'expander',
-                  'tw:opacity-50': isDragging && draggedColumnId === header.id,
-                  'tw:bg-blue-50': isDragging && draggedColumnId !== header.id
+                  'col-dragging': isDragging && draggedColumnId === header.id,
+                  'col-drop-left': isDragging && dragOverColumnId === header.id && dropSide === 'left' && draggedColumnId !== header.id,
+                  'col-drop-right': isDragging && dragOverColumnId === header.id && dropSide === 'right' && draggedColumnId !== header.id,
                 }
               ]"
               :draggable="header.id !== 'select' && header.id !== 'expander'"
@@ -93,6 +94,7 @@
               @dragover="header.id !== 'select' && header.id !== 'expander' ? handleDragOver(header.id, $event) : null"
               @drop="header.id !== 'select' && header.id !== 'expander' ? handleDrop(header.id, $event) : null"
               @dragend="handleDragEnd"
+              @dragleave="handleDragLeave(header.id, $event)"
             >
               <div class="tw:flex tw:items-center tw:gap-2">
                 <!-- Selection Header -->
@@ -106,9 +108,25 @@
                 
                 <!-- Regular Column Header -->
                 <template v-else>
-                  <span>{{ header.column.columnDef.header }}</span>
+                  <div 
+                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none tw:flex-1"
+                    @click="handleSort(header.column.id, header.column.getIsSorted() === 'asc', $event)"
+                  >
+                    <span class="tw:truncate">{{ header.column.columnDef.header }}</span>
+                    
+                    <!-- Sorting Priority Badge (e.g. 1 ASC) -->
+                    <span
+                      v-if="getSortPriority(header.column.id) > 0"
+                      class="tw:ml-1 tw:bg-blue-100 tw:text-blue-700 tw:text-[10px] tw:px-2 tw:py-0.5 tw:rounded-full tw:font-bold tw:flex tw:items-center tw:gap-1.5 hover:tw:bg-red-100 hover:tw:text-red-700 tw:transition-colors tw:cursor-pointer group/badge"
+                      title="Click to remove sort"
+                      @click.stop="removeSort(header.column.id)"
+                    >
+                      <span class="tw:whitespace-nowrap">{{ getSortPriority(header.column.id) }} {{ header.column.getIsSorted()?.toUpperCase() }}</span>
+                      <q-icon name="close" size="10px" class="tw:opacity-50 group-hover/badge:tw:opacity-100" />
+                    </span>
+                  </div>
                   
-                  <!-- Sort Indicator -->
+                  <!-- Sort Arrows Indicator -->
                   <div v-if="header.column.getCanSort()" class="tw:flex tw:items-center tw:gap-0.5 tw:ml-1">
                     <div class="tw:flex tw:flex-col">
                       <q-btn
@@ -117,7 +135,7 @@
                         size="xs"
                         icon="keyboard_arrow_up"
                         :class="getSortButtonClass(header.column.id, false)"
-                        @click="handleSort(header.column.id, false, $event as MouseEvent)"
+                        @click.stop="handleSort(header.column.id, false, $event)"
                       />
                       <q-btn
                         flat
@@ -125,26 +143,14 @@
                         size="xs"
                         icon="keyboard_arrow_down"
                         :class="getSortButtonClass(header.column.id, true)"
-                        @click="handleSort(header.column.id, true, $event as MouseEvent)"
+                        @click.stop="handleSort(header.column.id, true, $event)"
                       />
                     </div>
-                    <!-- Multi-sort priority badge -->
-                    <span
-                      v-if="sorting.length > 1 && getSortPriority(header.column.id) > 0"
-                      class="sort-priority-badge"
-                    >
-                      {{ getSortPriority(header.column.id) }}
-                    </span>
                   </div>
                 </template>
               </div>
               
-              <!-- Drop Indicator -->
-              <div
-                v-if="isDragging && dropIndicatorPosition !== null"
-                class="tw:absolute tw:top-0 tw:bottom-0 tw:w-0.5 tw:bg-blue-500 tw:z-20 tw:pointer-events-none"
-                :style="{ left: `${dropIndicatorPosition}px` }"
-              />
+              <!-- Drop Indicator line is now handled via col-drop-left / col-drop-right CSS classes -->
               
               <!-- Resize Handle -->
               <div
@@ -888,6 +894,7 @@ const table = useVueTable({
   enableColumnResizing: true,
   columnResizeMode: "onChange",
   groupedColumnMode: false, // Don't hide grouped columns
+  enableMultiSort: true, // Explicitly enable multi-column sorting
 })
 
 // Cached rows array for template rendering to prevent expensive O(n) getter calls
@@ -1064,7 +1071,8 @@ let columnResizingComposable: ReturnType<typeof useColumnResizing> | null = null
 // Reactive refs for composable state
 const isDragging = ref(false)
 const draggedColumnId = ref<string | null>(null)
-const dropIndicatorPosition = ref<number | null>(null)
+const dragOverColumnId = ref<string | null>(null)
+const dropSide = ref<'left' | 'right' | null>(null)
 const isResizing = ref(false)
 const resizingColumnId = ref<string | null>(null)
 
@@ -1095,7 +1103,8 @@ const initializeComposables = () => {
     if (columnReorderingComposable) {
       isDragging.value = columnReorderingComposable.isDragging.value
       draggedColumnId.value = columnReorderingComposable.draggedColumnId.value
-      dropIndicatorPosition.value = columnReorderingComposable.dropIndicatorPosition.value
+      dragOverColumnId.value = columnReorderingComposable.dragOverColumnId.value
+      dropSide.value = columnReorderingComposable.dropSide.value
     }
     if (columnResizingComposable) {
       isResizing.value = columnResizingComposable.isResizing.value
@@ -1115,6 +1124,18 @@ const handleDragOver = (columnId: string, event: DragEvent) => {
 
 const handleDragEnd = (event: DragEvent) => {
   columnReorderingComposable?.handleDragEnd(event)
+}
+
+const handleDragLeave = (columnId: string, event: DragEvent) => {
+  // Clear the indicator when the cursor leaves a column entirely
+  // Only clear if we're leaving to something outside the th (relatedTarget is outside)
+  const related = event.relatedTarget as HTMLElement | null
+  const currentTh = event.currentTarget as HTMLElement | null
+  if (related && currentTh?.contains(related)) return
+  if (columnReorderingComposable && dragOverColumnId.value === columnId) {
+    columnReorderingComposable.dragOverColumnId.value = null
+    columnReorderingComposable.dropSide.value = null
+  }
 }
 
 const handleDrop = (targetColumnId: string, event: DragEvent) => {
@@ -1390,7 +1411,9 @@ const handleRetryDetailLoad = async (rowId: string) => {
 const getSortButtonClass = (columnId: string, desc: boolean) => {
   const sortState = sorting.value.find(s => s.id === columnId)
   const isActive = sortState && sortState.desc === desc
-  return isActive ? 'text-blue-600 tw:font-bold' : 'text-gray-400'
+  return isActive 
+    ? 'tw:text-blue-600 tw:font-bold tw:scale-125' 
+    : 'tw:text-gray-300'
 }
 
 // Get the sort priority index (1-based) for multi-column sort display
@@ -1399,43 +1422,39 @@ const getSortPriority = (columnId: string): number => {
   return index >= 0 ? index + 1 : -1
 }
 
-const handleSort = (columnId: string, desc: boolean, event?: MouseEvent) => {
-  console.log('Sort clicked:', { columnId, desc, shiftKey: event?.shiftKey })
-  
-  const column = table.getColumn(columnId)
-  if (!column) {
-    console.log('Column not found:', columnId)
-    return
-  }
+const removeSort = (columnId: string) => {
+  const newSorting = sorting.value.filter(s => s.id !== columnId)
+  gridStore.setSorting(newSorting)
+}
 
-  if (event?.shiftKey) {
-    // Multi-column sort: add/toggle this column in the existing sort array
-    const existingIndex = sorting.value.findIndex(s => s.id === columnId)
-    const newSorting = [...sorting.value]
-    
-    if (existingIndex >= 0) {
-      // Column already in sort — check if same direction
-      if (newSorting[existingIndex].desc === desc) {
-        // Same direction clicked again: remove from multi-sort
-        newSorting.splice(existingIndex, 1)
+const handleSort = (columnId: string, targetDesc: boolean, event?: MouseEvent) => {
+  const isMultiSort = event?.shiftKey || false
+  const currentSorting = [...sorting.value]
+  const existingIndex = currentSorting.findIndex(s => s.id === columnId)
+  const existing = currentSorting[existingIndex]
+
+  if (isMultiSort) {
+    if (existing) {
+      if (existing.desc === targetDesc) {
+        currentSorting.splice(existingIndex, 1) // Clear
       } else {
-        // Different direction: update direction
-        newSorting[existingIndex] = { id: columnId, desc }
+        currentSorting[existingIndex] = { id: columnId, desc: targetDesc } // Flip
       }
     } else {
-      // New column: append to sort array
-      newSorting.push({ id: columnId, desc })
+      currentSorting.push({ id: columnId, desc: targetDesc }) // Add
     }
-    
-    gridStore.setSorting(newSorting)
+    gridStore.setSorting(currentSorting)
   } else {
-    // Single-column sort: replace all sorting with just this column
-    const currentSort = sorting.value.find(s => s.id === columnId)
-    if (currentSort && currentSort.desc === desc) {
-      // Already sorted in this direction: clear sort
-      gridStore.setSorting([])
+    // Single column 3-state cycle: None -> Asc -> Desc -> None
+    if (!existing) {
+      // Current: None -> Next: Asc (or targetDesc if from arrow)
+      gridStore.setSorting([{ id: columnId, desc: targetDesc }])
+    } else if (!existing.desc) {
+      // Current: Asc -> Next: Desc
+      gridStore.setSorting([{ id: columnId, desc: true }])
     } else {
-      gridStore.setSorting([{ id: columnId, desc }])
+      // Current: Desc -> Next: None
+      gridStore.setSorting([])
     }
   }
 }
@@ -1486,6 +1505,12 @@ const handleColumnDoubleClick = (columnId: string) => {
 onMounted(() => {
   console.log('[DataGrid] onMounted - Initializing grid state for:', gridId.value)
   
+  // CRITICAL: Reset sorting from any previously mounted grid.
+  // DataGrid remounts on every navigation (v-else-if in GenericGrid.vue) but gridStore
+  // is a Pinia singleton that survives across mounts. Without this reset, sorts from the
+  // previous grid bleed into this one, causing the first sort to show the wrong priority.
+  gridStore.setSorting([])
+
   // Initialize grid state with default config
   // IMPORTANT: Only include data columns in the order, exclude special columns (select, expander)
   const defaultColumnOrder = props.data?.columns?.map(col => col.id) || []
@@ -1508,7 +1533,8 @@ onMounted(() => {
   gridStateStore.initializeGrid(gridId.value, {
     columnOrder: defaultColumnOrder, // Only data columns
     columnWidths: defaultColumnWidths,
-    columnVisibility: defaultColumnVisibility
+    columnVisibility: defaultColumnVisibility,
+    sorting: []
   })
   
   // Get the loaded config (which may have been loaded from localStorage)
@@ -1551,6 +1577,12 @@ onMounted(() => {
     table.setColumnSizing(loadedConfig.columnWidths)
   }
   
+  // Apply loaded sorting to gridStore
+  if (loadedConfig && loadedConfig.sorting && Array.isArray(loadedConfig.sorting)) {
+    console.log('[DataGrid] Applying loaded sorting:', loadedConfig.sorting)
+    gridStore.setSorting(loadedConfig.sorting)
+  }
+  
   // Initialize composables after grid state is ready
   initializeComposables()
   
@@ -1559,6 +1591,45 @@ onMounted(() => {
     const ids = props.data.rows.map(r => String(r[props.data!.primaryKey || 'id']))
     gridStore.expandAllRows(ids)
   }
+})
+
+// Persistence watcher for sorting
+watch(sorting, (newSorting) => {
+  if (gridId.value && gridId.value !== 'unknown') {
+    console.log(`[DataGrid] Saving sorting for ${gridId.value}:`, newSorting)
+    gridStateStore.updateSorting(gridId.value, newSorting)
+  }
+}, { deep: true })
+
+// When the dataset changes (e.g. navigating Users → Stress Test), reset sorting
+// to the correct state for the new grid. Without this, the old sorting array bleeds
+// into the new grid, so the first sort you add shows priority 4 instead of 1.
+watch(gridId, (newId, oldId) => {
+  if (!newId || newId === oldId) return
+  console.log(`[DataGrid] Grid changed: ${oldId} → ${newId}. Re-hydrating sorting.`)
+
+  // Ensure the new grid is initialized in the store
+  if (!gridStateStore.grids[newId]) {
+    const defaultColumnOrder = props.data?.columns?.map(col => col.id) || []
+    const defaultColumnWidths: Record<string, number> = {}
+    const defaultColumnVisibility: Record<string, boolean> = {}
+    props.data?.columns?.forEach(col => {
+      defaultColumnWidths[col.id] = col.width || 150
+      defaultColumnVisibility[col.id] = true
+    })
+    gridStateStore.initializeGrid(newId, {
+      columnOrder: defaultColumnOrder,
+      columnWidths: defaultColumnWidths,
+      columnVisibility: defaultColumnVisibility,
+      sorting: []
+    })
+  }
+
+  // Load sorting for the incoming grid ([] if never sorted before)
+  const config = gridStateStore.getGridConfig(newId).value
+  const restoredSorting = (config?.sorting && Array.isArray(config.sorting)) ? config.sorting : []
+  console.log(`[DataGrid] Restoring sorting for ${newId}:`, restoredSorting)
+  gridStore.setSorting(restoredSorting)
 })
 
 // Cleanup expanded rows when data changes
@@ -1843,9 +1914,23 @@ const handleResetCustomization = (groupColumn: string, groupValue: any) => {
 // Drag and drop styles
 th[draggable="true"]
   user-select: none
-  
+
   &:active
     cursor: grabbing
+
+// Dragged column: dim it slightly so users can see it's being moved
+th.col-dragging
+  opacity: 0.4
+  background-color: #f8faff
+
+// Drop target indicators — a 3px colored border on the target column
+th.col-drop-left
+  border-left: 3px solid #1976d2 !important
+  background-color: rgba(25, 118, 210, 0.04)
+
+th.col-drop-right
+  border-right: 3px solid #1976d2 !important
+  background-color: rgba(25, 118, 210, 0.04)
 
 // Resize handle styles
 .resize-handle

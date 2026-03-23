@@ -6,6 +6,7 @@ export interface GridConfig {
   columnOrder: string[]
   columnWidths: Record<string, number>
   columnVisibility: Record<string, boolean>
+  sorting: any[]
   version: number
   lastUpdated: number
 }
@@ -20,7 +21,7 @@ export interface IGridStateStorage {
 
 export class GridStateStorage implements IGridStateStorage {
   private readonly STORAGE_PREFIX = 'grid_state_'
-  private readonly CURRENT_VERSION = 1
+  private readonly CURRENT_VERSION = 2
 
   /**
    * Save grid configuration to localStorage
@@ -109,7 +110,21 @@ export class GridStateStorage implements IGridStateStorage {
         columnOrder: config.columnOrder || [],
         columnWidths: config.columnWidths || {},
         columnVisibility: config.columnVisibility || {},
+        sorting: config.sorting || [],
         version: 1,
+        lastUpdated: Date.now()
+      }
+    }
+
+    // v1 -> v2 migration: clear corrupt sorting data saved by the old buggy watcher.
+    // Previously, sorting state from one grid could leak into another grid's localStorage
+    // key. We reset sorting to [] here so each grid starts fresh and only saves its own
+    // correctly-attributed sorts going forward.
+    if (fromVersion <= 1 && toVersion >= 2) {
+      config = {
+        ...config,
+        sorting: [],
+        version: 2,
         lastUpdated: Date.now()
       }
     }

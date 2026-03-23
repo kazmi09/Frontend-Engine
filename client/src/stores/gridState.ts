@@ -154,6 +154,22 @@ export const useGridStateStore = defineStore('gridState', () => {
     debouncedPersist(gridId)
   }
   
+  // Actions - Sorting Management
+  const updateSorting = (gridId: string, sorting: any[]) => {
+    if (!grids.value[gridId]) {
+      console.warn(`Grid ${gridId} not initialized`)
+      return
+    }
+    
+    grids.value[gridId] = {
+      ...grids.value[gridId],
+      sorting,
+      lastUpdated: Date.now()
+    }
+    
+    debouncedPersist(gridId)
+  }
+  
   // Actions - State Lifecycle
   const initializeGrid = (gridId: string, defaultConfig: Partial<GridConfig>) => {
     console.log('[gridStateStore] initializeGrid called for:', gridId)
@@ -171,6 +187,7 @@ export const useGridStateStore = defineStore('gridState', () => {
         columnOrder: defaultConfig.columnOrder || [],
         columnWidths: defaultConfig.columnWidths || {},
         columnVisibility: defaultConfig.columnVisibility || {},
+        sorting: defaultConfig.sorting || [],
         version: 1,
         lastUpdated: Date.now()
       }
@@ -184,6 +201,7 @@ export const useGridStateStore = defineStore('gridState', () => {
         columnOrder: defaultConfig.columnOrder || [],
         columnWidths: defaultConfig.columnWidths || {},
         columnVisibility: defaultConfig.columnVisibility || {},
+        sorting: defaultConfig.sorting || [],
         version: 1,
         lastUpdated: Date.now()
       }
@@ -272,6 +290,9 @@ export const useGridStateStore = defineStore('gridState', () => {
     
     // Actions - Column Visibility
     updateColumnVisibility,
+    
+    // Actions - Sorting
+    updateSorting,
     
     // Actions - State Lifecycle
     initializeGrid,
