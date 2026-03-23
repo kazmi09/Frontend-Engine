@@ -8,20 +8,15 @@
         
         <q-space />
         
-        <!-- Navigation buttons -->
+        <!-- Dynamic Navigation buttons -->
         <q-btn
+          v-for="grid in gridConfigs"
+          :key="grid.id"
           flat
-          icon="group"
-          label="Users"
-          @click="$router.push('/grid/users')"
-          :class="$route.path.includes('/users') ? 'tw:bg-white tw:text-primary' : ''"
-        />
-        <q-btn
-          flat
-          icon="inventory_2"
-          label="Products"
-          @click="$router.push('/grid/products')"
-          :class="$route.path.includes('/products') ? 'tw:bg-white tw:text-primary' : ''"
+          :icon="grid.icon || 'grid_on'"
+          :label="grid.name"
+          @click="$router.push(`/grid/${grid.id}`)"
+          :class="$route.path.includes(`/${grid.id}`) ? 'tw:bg-white tw:text-primary' : ''"
         />
       </q-toolbar>
     </q-header>
@@ -35,7 +30,9 @@
 </template>
 
 <script setup lang="ts">
-// App.vue now includes navigation and router outlet
+import { getAllGridConfigs } from '@shared/grid-config'
+
+const gridConfigs = getAllGridConfigs()
 </script>
 
 <style lang="sass">

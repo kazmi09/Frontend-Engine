@@ -160,14 +160,26 @@ export class GenericQueryBuilder {
       endpoint = `/filter?key=${filterKey}&value=${filterValue}`
     }
 
+    const limitParam = api.queryMapping?.limitParam || 'limit'
+    const skipParam = api.queryMapping?.skipParam || 'skip'
+    const pageParam = api.queryMapping?.pageParam
+
+    const getPaginationQuery = (skipPos: number) => {
+      if (pageParam) {
+        const page = Math.floor(skipPos / targetLimit) + 1
+        return `${pageParam}=${page}&${limitParam}=${targetLimit}`
+      }
+      return `${limitParam}=${targetLimit}&${skipParam}=${skipPos}`
+    }
+
     let apiSkip = requestedSkip
-    let response = await fetch(`${api.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
+    let response = await fetch(`${api.baseUrl}${endpoint}${endpoint.includes('?') ? '&' : '?'}${getPaginationQuery(apiSkip)}`, {
       headers: api.headers || {}
     })
 
     if (!response.ok && (searchText || Object.keys(filterBy).length > 0)) {
       // Fallback if search/filter endpoint didn't work as expected
-      response = await fetch(`${api.baseUrl}${api.endpoints.list}${api.endpoints.list.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
+      response = await fetch(`${api.baseUrl}${api.endpoints.list}${api.endpoints.list.includes('?') ? '&' : '?'}${getPaginationQuery(apiSkip)}`, {
         headers: api.headers || {}
       })
     }
@@ -198,35 +210,23 @@ export class GenericQueryBuilder {
       allData = responseData
     }
 
-    let apiTotal = responseData.total || responseData.totalRows || responseData.count || allData.length
-    
-    // Virtual inflation logic
-    const TARGET_VOLUME = 100000
-    if (requestedSkip >= apiTotal && apiTotal > 0 && !searchText) {
-      apiSkip = requestedSkip % apiTotal
-      
-      const retryResponse = await fetch(`${api.baseUrl}${api.endpoints.list}${api.endpoints.list.includes('?') ? '&' : '?'}limit=${targetLimit}&skip=${apiSkip}`, {
-        headers: api.headers || {}
-      })
-      
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json()
-        allData = retryData[listKey] || (Array.isArray(retryData) ? retryData : [])
+    // If the API doesn't provide a total, estimate it conservatively to enable infinite scrolling.
+    // E.g. If we asked for 20 and got 20, assume there's at least one more page.
+    let apiTotal = responseData.total || responseData.totalRows || responseData.count
+
+    if (apiTotal === undefined) {
+      if (allData.length === targetLimit) {
+        // We probably have more pages to load since we got a full page
+        apiTotal = requestedSkip + targetLimit + 1
+      } else {
+        // We reached the end of the data (got less than limit or empty)
+        apiTotal = requestedSkip + allData.length
       }
     }
 
-    // Adjust IDs for uniqueness
-    const virtualPageOffset = Math.floor(requestedSkip / (apiTotal || 1))
-    const processedRows = allData.map((item: any) => ({
-      ...item,
-      id: item.id ? (typeof item.id === 'number' ? item.id + (virtualPageOffset * 1000000) : `${item.id}-${virtualPageOffset}`) : `row-${requestedSkip}-${Math.random()}`
-    }))
-
-    const totalRows = searchText ? apiTotal : Math.max(apiTotal, TARGET_VOLUME)
-
     return {
-      rows: processedRows,
-      totalRows,
+      rows: allData,
+      totalRows: apiTotal,
       pageIndex,
       pageSize
     }

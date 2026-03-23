@@ -32,6 +32,31 @@ export interface ColumnConfig {
   }
 }
 
+export interface GridApiConfig {
+  baseUrl: string
+  endpoints: {
+    list: string
+    get?: string
+    create?: string
+    update?: string
+    delete?: string
+    bulkEdit?: string
+    bulkDelete?: string
+    bulkArchive?: string
+    export?: string
+  }
+  headers?: Record<string, string>
+  /**
+   * Defines how query parameters are mapped for this API.
+   * By default, it uses ?limit=XX&skip=YY (good for DummyJSON).
+   */
+  queryMapping?: {
+    limitParam?: string
+    skipParam?: string
+    pageParam?: string
+  }
+}
+
 export interface GridDataSource {
   type: 'mysql' | 'api' | 'static'
   connection?: {
@@ -39,21 +64,7 @@ export interface GridDataSource {
     primaryKey: string
     database?: string
   }
-  api?: {
-    baseUrl: string
-    endpoints: {
-      list: string
-      get?: string
-      create?: string
-      update?: string
-      delete?: string
-      bulkEdit?: string
-      bulkDelete?: string
-      bulkArchive?: string
-      export?: string
-    }
-    headers?: Record<string, string>
-  }
+  api?: GridApiConfig
   static?: {
     data: any[]
   }
@@ -534,6 +545,44 @@ export const GRID_CONFIGS: Record<string, GridConfig> = {
     filters: {
       enabled: true,
       filterableColumns: ['level', 'component', 'status']
+    }
+  },
+
+  // External Mock API requested by the user
+  'mock-api': {
+    id: 'mock-api',
+    name: 'Mock API Test',
+    description: 'External data from mockapi.io',
+    icon: 'cloud_sync',
+    displayName: 'item',
+    displayNamePlural: 'items',
+    dataSource: {
+      type: 'api',
+      api: {
+        baseUrl: 'https://69c08cc5085e1a9fae3e91a3.mockapi.io/api/test',
+        endpoints: {
+          list: '/test',
+        },
+        queryMapping: {
+          limitParam: 'limit',
+          pageParam: 'page' // MockAPI expects ?page=1 instead of ?skip=0
+        }
+      }
+    },
+    columns: [
+      { id: 'id', label: 'ID', type: 'number', width: 80 },
+      { id: 'name', label: 'Name', type: 'string', width: 200 },
+      { id: 'createdAt', label: 'Created At', type: 'date', width: 200 },
+      { id: 'avatar', label: 'Avatar URL', type: 'string', width: 300 },
+    ],
+    pagination: {
+      enabled: true,
+      defaultPageSize: 20,
+      pageSizeOptions: [10, 20, 50]
+    },
+    search: {
+      enabled: true,
+      searchableColumns: ['name']
     }
   }
 }
