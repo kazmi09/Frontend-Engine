@@ -37,7 +37,7 @@
             label="Bulk Edit"
             color="primary"
             @click="openBulkEditDialog"
-            :loading="isLoading"
+            :loading="actionLoading['edit']"
           />
           
           <q-btn
@@ -47,7 +47,7 @@
             label="Export"
             color="positive"
             @click="exportSelected"
-            :loading="isExporting"
+            :loading="actionLoading['export']"
           />
           
           <q-btn
@@ -57,7 +57,7 @@
             label="Archive"
             color="warning"
             @click="archiveSelected"
-            :loading="isArchiving"
+            :loading="actionLoading['archive']"
           />
           
           <q-btn
@@ -67,7 +67,7 @@
             label="Delete"
             color="negative"
             @click="confirmDelete"
-            :loading="isDeleting"
+            :loading="actionLoading['delete']"
           />
         </div>
       </div>
@@ -101,7 +101,7 @@
           label="Delete" 
           color="negative" 
           @click="deleteSelected"
-          :loading="isDeleting"
+          :loading="actionLoading['delete']"
         />
       </q-card-actions>
     </q-card>
@@ -117,7 +117,7 @@ import BulkEditDialog from './BulkEditDialog.vue'
 
 const props = defineProps<{
   columns: ColumnConfig[]
-  bulkActionsConfig?: BulkActionsConfig
+  bulkActionsConfig?: any
   displayName?: string
   displayNamePlural?: string
 }>()
@@ -127,7 +127,7 @@ const emit = defineEmits<{
   bulkArchive: [selectedIds: string[]]
   bulkDelete: [selectedIds: string[]]
   export: [selectedIds: string[]]
-  customAction: [data: { actionId: string, selectedIds: string[], action: CustomBulkAction }]
+  customAction: [data: { actionId: string, selectedIds: string[], action: any }]
 }>()
 
 const gridStore = useGridStore()
@@ -140,7 +140,7 @@ const actionLoading = ref<Record<string, boolean>>({})
 const showBulkEditDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showCustomActionDialog = ref(false)
-const currentCustomAction = ref<CustomBulkAction | null>(null)
+const currentCustomAction = ref<any | null>(null)
 
 // Computed
 const selectedCount = computed(() => {
@@ -210,7 +210,7 @@ const deleteSelected = async () => {
   }
 }
 
-const handleCustomAction = (action: CustomBulkAction) => {
+const handleCustomAction = (action: any) => {
   currentCustomAction.value = action
   if (action.confirmationRequired !== false) {
     showCustomActionDialog.value = true

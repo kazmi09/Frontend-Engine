@@ -198,8 +198,8 @@ const cellClass = computed(() => {
 
 // Validation
 const validate = (val: any): string | null => {
-  if (props.column.validator) {
-    return props.column.validator(val)
+  if ((props.column as any).validator) {
+    return (props.column as any).validator(val)
   }
   return null
 }

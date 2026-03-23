@@ -52,4 +52,5 @@ export interface DataResult {
     totalRows: number
   }
   expandable?: ExpandableConfig
+  gridId?: string
 }

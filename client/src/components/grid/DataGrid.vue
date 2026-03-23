@@ -7,7 +7,7 @@
       <div>Table rows: {{ table.getRowModel().rows.length }}</div>
       <div>Virtual items: {{ rowVirtualizer && typeof rowVirtualizer.getVirtualItems === 'function' ? rowVirtualizer.getVirtualItems().length : 'N/A' }}</div>
       <div>Total size: {{ rowVirtualizer && typeof rowVirtualizer.getTotalSize === 'function' ? rowVirtualizer.getTotalSize() : 'N/A' }}px</div>
-      <div>First row data: {{ JSON.stringify(props.data?.rows?.[0]) }}</div>
+      <div>First row data: {{ props.data?.rows?.[0] ? 'Loaded' : 'None' }}</div>
     </div>
 
     <!-- Table Container -->
@@ -228,8 +228,7 @@
           </tr>
           
           <template v-for="virtualRow in rowVirtualizer.getVirtualItems()" :key="virtualRow.index">
-            <template v-if="table?.getRowModel?.()?.rows[virtualRow.index]">
-              <template v-for="row in [table.getRowModel().rows[virtualRow.index]]" :key="row.id">
+            <template v-for="row in (tableRows[virtualRow.index] ? [tableRows[virtualRow.index]] : [])" :key="row.id">
                 <!-- Debug: Log row info -->
                 <template v-if="false">
                   {{ console.log('Row:', { 
@@ -301,7 +300,7 @@
                             v-if="cell.getIsGrouped()"
                             :dataset="gridId"
                             :group-column="cell.column.id"
-                            :group-column-label="cell.column.columnDef.header ?? cell.column.id"
+                            :group-column-label="String(cell.column.columnDef.header ?? cell.column.id)"
                             :group-value="String(cell.getValue() ?? '')"
                             :current-customization="getGroupCustomization(cell.column.id, cell.getValue())"
                             @save="(customization) => handleSaveCustomization(cell.column.id, cell.getValue(), customization)"
@@ -406,7 +405,6 @@
                 </tr>
               </template>
             </template>
-          </template>
           
           <!-- Bottom spacer -->
           <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
@@ -474,7 +472,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, watch, watchEffect } from 'vue'
+import { computed, ref, shallowRef, onMounted, watch, watchEffect } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
@@ -522,6 +520,7 @@ const props = defineProps<{
    * view/edit behaviour, which is useful for testing and demos.
    */
   activeRole?: string | null
+  bulkActionsConfig?: any
 }>()
 
 const emit = defineEmits<{
@@ -543,7 +542,9 @@ const scrollTimeout = ref<number | null>(null)
 const visibleRowRange = ref({
   first: '',
   last: '',
-  count: 0
+  count: 0,
+  firstIndex: -1,
+  lastIndex: -1
 })
 
 // Use storeToRefs to make store properties reactive
@@ -570,21 +571,37 @@ const hasExpandPermission = computed(() => {
   if (!props.data?.expandable?.requiredPermissions) {
     return true
   }
-  const userRole = user.value.role
+  const userRole = user.value?.role
+  if (!userRole) return false
   const hasPermission = props.data.expandable.requiredPermissions.includes(userRole)
   return hasPermission
 })
 
-// Columns definition
-const columns = computed<ColumnDef<any>[]>(() => {
+// Columns definition (Memoized to prevent cascading re-renders in TanStack Table)
+const columns = shallowRef<ColumnDef<any>[]>([])
+const _prevColumnsHash = ref('')
+
+watch(() => [props.data?.columns, props.data?.expandable, hasExpandPermission.value], () => {
   if (!props.data?.columns || !Array.isArray(props.data.columns)) {
-    return []
+    if (columns.value.length !== 0) columns.value = []
+    return
   }
+
+  // Create a fingerprint of the configuration to prevent recreation
+  const extendable = !!props.data.expandable
+  const permissions = hasExpandPermission.value
+  
+  // Safely hash column configuration without risking JSON.stringify circular dependency crashes
+  const colHash = props.data.columns.map(c => `${c.id}:${c.width}:${c.type}:${c.label}`).join('|')
+  const hash = `${colHash}-${extendable}-${permissions}`
+  
+  if (hash === _prevColumnsHash.value) return
+  _prevColumnsHash.value = hash
   
   const cols: ColumnDef<any>[] = []
   
   // Add expander column if expandable config exists and user has permissions
-  if (props.data.expandable && hasExpandPermission.value) {
+  if (extendable && permissions) {
     cols.push({
       id: "expander",
       header: "",
@@ -678,8 +695,8 @@ const columns = computed<ColumnDef<any>[]>(() => {
   })
 
   cols.push(selectColumn, ...dataColumns)
-  return cols
-})
+  columns.value = cols
+}, { immediate: true, deep: true })
 
 // Table instance with reactive state
 const table = useVueTable({
@@ -868,6 +885,9 @@ const table = useVueTable({
   groupedColumnMode: false, // Don't hide grouped columns
 })
 
+// Cached rows array for template rendering to prevent expensive O(n) getter calls
+const tableRows = computed(() => table?.getRowModel?.()?.rows || [])
+
 // Virtual scrolling setup
 const rowVirtualizer = useVirtualizer({
   get count() {
@@ -887,11 +907,12 @@ const rowVirtualizer = useVirtualizer({
 // Update visible row range
 const updateVisibleRowRange = () => {
   // Check if rowVirtualizer is initialized
-  if (!rowVirtualizer || typeof rowVirtualizer.getVirtualItems !== 'function') {
+  const virt = rowVirtualizer.value
+  if (!virt || typeof virt.getVirtualItems !== 'function') {
     return
   }
   
-  const virtualItems = rowVirtualizer.getVirtualItems()
+  const virtualItems = virt.getVirtualItems()
   
   if (virtualItems.length > 0) {
     const firstIndex = virtualItems[0].index
@@ -903,7 +924,9 @@ const updateVisibleRowRange = () => {
       const newRange = {
         first: String(rows[firstIndex].original[primaryKey] || rows[firstIndex].original.id || ''),
         last: String(rows[lastIndex].original[primaryKey] || rows[lastIndex].original.id || ''),
-        count: lastIndex - firstIndex + 1
+        count: lastIndex - firstIndex + 1,
+        firstIndex,
+        lastIndex
       }
       
       // Only update if changed to trigger reactivity
@@ -922,13 +945,6 @@ onMounted(() => {
     setTimeout(() => {
       updateVisibleRowRange()
     }, 100)
-    
-    // Add interval-based updates for infinite scroll mode
-    const updateInterval = setInterval(() => {
-      if (props.hasNextPage || props.isFetchingNext) {
-        updateVisibleRowRange()
-      }
-    }, 500) // Update every 500ms in infinite scroll mode
     
     // Throttle scroll updates for smooth performance
     let scrollRAF: number | null = null
@@ -982,7 +998,6 @@ onMounted(() => {
     // Cleanup on unmount
     return () => {
       container.removeEventListener('scroll', handleScroll)
-      clearInterval(updateInterval)
       if (scrollRAF) {
         cancelAnimationFrame(scrollRAF)
       }
@@ -990,15 +1005,21 @@ onMounted(() => {
   }
 })
 
-// Also update visible range when virtual items change
+// Also update visible range when virtual items change (only when boundaries change)
 watch(() => {
-  if (rowVirtualizer && typeof rowVirtualizer.getVirtualItems === 'function') {
-    return rowVirtualizer.getVirtualItems()
+  const virt = rowVirtualizer.value
+  if (virt && typeof virt.getVirtualItems === 'function') {
+    const items = virt.getVirtualItems()
+    if (items.length > 0) {
+      return `${items[0].index}-${items[items.length - 1].index}`
+    }
   }
-  return []
-}, () => {
-  updateVisibleRowRange()
-}, { deep: true })
+  return ''
+}, (newVal, oldVal) => {
+  if (newVal !== oldVal) {
+    updateVisibleRowRange()
+  }
+})
 
 // Update visible row range when data changes
 watch(() => props.data?.rows, () => {
@@ -1009,7 +1030,13 @@ watch(() => props.data?.rows, () => {
 
 // Force table re-render when state changes
 const tableKey = computed(() => {
-  return `${JSON.stringify(columnVisibility.value)}-${JSON.stringify(sorting.value)}`
+  const visKey = Object.entries(columnVisibility.value || {})
+    .map(([k, v]) => `${k}:${v}`)
+    .join(',')
+  const sortKey = (sorting.value || [])
+    .map(s => `${s.id}:${s.desc}`)
+    .join(',')
+  return `${visKey}-${sortKey}`
 })
 
 // Total pixel width of all visible columns — drives explicit table width so
@@ -1126,10 +1153,7 @@ const currentVirtualPage = computed({
         return 1
       }
       
-      const firstVisibleIndex = props.data.rows.findIndex(row => {
-        const primaryKey = props.data?.primaryKey || 'id'
-        return String(row[primaryKey]) === firstVisibleId
-      })
+      const firstVisibleIndex = visibleRowRange.value.firstIndex
       
       if (firstVisibleIndex >= 0) {
         const currentPageSize = pageSize.value
@@ -1156,13 +1180,10 @@ const startRow = computed(() => {
     const firstVisibleId = visibleRowRange.value.first
     if (firstVisibleId === '') return 1
     
-    // Find the index of the first visible row in the loaded data
-    const firstVisibleIndex = props.data?.rows?.findIndex(row => {
-      const primaryKey = props.data?.primaryKey || 'id'
-      return String(row[primaryKey]) === firstVisibleId
-    })
+    // Use cached absolute index
+    const firstVisibleIndex = visibleRowRange.value.firstIndex
     
-    return firstVisibleIndex !== undefined && firstVisibleIndex >= 0 ? firstVisibleIndex + 1 : 1
+    return firstVisibleIndex >= 0 ? firstVisibleIndex + 1 : 1
   } else {
     // Regular pagination mode
     return pageIndex.value * pageSize.value + 1
@@ -1175,13 +1196,10 @@ const endRow = computed(() => {
     const lastVisibleId = visibleRowRange.value.last
     if (lastVisibleId === '') return loadedRows.value
     
-    // Find the index of the last visible row in the loaded data
-    const lastVisibleIndex = props.data?.rows?.findIndex(row => {
-      const primaryKey = props.data?.primaryKey || 'id'
-      return String(row[primaryKey]) === lastVisibleId
-    })
+    // Use cached absolute index
+    const lastVisibleIndex = visibleRowRange.value.lastIndex
     
-    return lastVisibleIndex !== undefined && lastVisibleIndex >= 0 ? lastVisibleIndex + 1 : loadedRows.value
+    return lastVisibleIndex >= 0 ? lastVisibleIndex + 1 : loadedRows.value
   } else {
     // Regular pagination mode
     return Math.min((pageIndex.value + 1) * pageSize.value, totalRows.value)
@@ -1235,10 +1253,10 @@ const skeletonRowCount = computed(() => {
 })
 
 // Helper function to determine skeleton type based on column type
-const getSkeletonType = (col: any, index: number) => {
+const getSkeletonType = (col: any, index: number): 'text' | 'rect' | 'QCheckbox' => {
   if (!col || !col.type) {
     // Vary skeleton types for visual interest when no column info
-    const types = ['text', 'text', 'text', 'rect', 'text']
+    const types: ('text' | 'rect')[] = ['text', 'text', 'text', 'rect', 'text']
     return types[index % types.length]
   }
   
@@ -1340,7 +1358,7 @@ const handleToggleExpansion = (rowId: string) => {
     gridStore.toggleRowExpansion(rowId)
   }
   
-  console.log('After toggle, expandedRows state:', JSON.stringify(expandedRows.value))
+  console.log('After toggle, expandedRows state updated')
   console.log('=== END DEBUG ===')
 }
 
@@ -1351,8 +1369,8 @@ const handleRetryDetailLoad = async (rowId: string) => {
   gridStore.setDetailPanelLoading(rowId, true)
   try {
     const row = props.data.rows.find(r => String(r[props.data?.primaryKey || 'id']) === rowId)
-    if (row) {
-      const data = await props.data.expandable.lazyLoad(row, rowId)
+    if (row && typeof props.data.expandable.lazyLoadFn === 'function') {
+      const data = await props.data.expandable.lazyLoadFn(row, rowId)
       gridStore.setDetailPanelData(rowId, data)
     }
   } catch (err) {
@@ -1532,8 +1550,9 @@ onMounted(() => {
   initializeComposables()
   
   // Initialize expanded rows if configured
-  if (props.data?.expandable?.defaultExpanded) {
-    gridStore.expandAllRows(props.data.expandable.defaultExpanded)
+  if (props.data?.expandable?.defaultExpanded && props.data.rows) {
+    const ids = props.data.rows.map(r => String(r[props.data!.primaryKey || 'id']))
+    gridStore.expandAllRows(ids)
   }
 })
 
@@ -1545,7 +1564,7 @@ watch(() => props.data?.rows, (newRows) => {
     const validAndGroupIds = [...validRowIds, ...Object.keys(expandedRows.value).filter(id => id.includes(':'))]
     gridStore.cleanupExpandedRows(validAndGroupIds)
   }
-}, { deep: true })
+})
 
 // Cleanup expanded rows when page changes
 watch(pageIndex, () => {
@@ -1555,6 +1574,10 @@ watch(pageIndex, () => {
     gridStore.cleanupExpandedRows(validAndGroupIds)
   }
 })
+
+const handleCustomAction = (actionDetails: any) => {
+  console.log('Custom action triggered:', actionDetails)
+}
 
 // Bulk action handlers
 const handleBulkEdit = (data: { selectedIds: string[], updates: Record<string, any> }) => {
