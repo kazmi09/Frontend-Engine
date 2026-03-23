@@ -204,11 +204,17 @@ export function registerGenericGridRoutes(app: Express) {
       }
       
       const gridService = new GenericGridService(gridId)
-      const csvContent = await gridService.exportData(selectedIds)
+      const { format = 'csv', sorting, visibleColumnIds } = req.body
+      const content = await gridService.exportData(selectedIds, format, sorting, visibleColumnIds)
       
-      res.setHeader('Content-Type', 'text/csv')
-      res.setHeader('Content-Disposition', `attachment; filename="${gridId}_export_${new Date().toISOString().split('T')[0]}.csv"`)
-      res.send(csvContent)
+      if (format === 'pdf') {
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="${gridId}_export_${new Date().toISOString().split('T')[0]}.pdf"`)
+      } else {
+        res.setHeader('Content-Type', 'text/csv')
+        res.setHeader('Content-Disposition', `attachment; filename="${gridId}_export_${new Date().toISOString().split('T')[0]}.csv"`)
+      }
+      res.send(content)
     } catch (error: any) {
       console.error(`[API] Error in export for grid ${req.params.gridId}:`, error)
       res.status(500).json({ 

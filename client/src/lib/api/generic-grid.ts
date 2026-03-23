@@ -135,13 +135,13 @@ export function createGridApi(config: GridApiConfig) {
       return response.json();
     },
 
-    exportSelected: async (selectedIds: string[]) => {
+    exportSelected: async (selectedIds: string[], format: 'csv' | 'pdf' = 'csv', sorting?: any[], visibleColumnIds?: string[]) => {
       const response = await fetch(`${API_BASE}/grid/${gridId}/export`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ selectedIds }),
+        body: JSON.stringify({ selectedIds, format, sorting, visibleColumnIds }),
       });
       
       if (!response.ok) {
@@ -149,12 +149,13 @@ export function createGridApi(config: GridApiConfig) {
         throw new Error(error.message || error.error || `Failed to export ${gridId} records`);
       }
       
-      // Handle CSV download
+      // Handle download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${gridId}_export_${new Date().toISOString().split('T')[0]}.csv`;
+      const extension = format === 'pdf' ? 'pdf' : 'csv';
+      a.download = `${gridId}_export_${new Date().toISOString().split('T')[0]}.${extension}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

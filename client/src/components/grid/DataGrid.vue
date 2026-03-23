@@ -392,7 +392,7 @@
                       :row="row.original"
                       :row-id="String(row.original[props.data?.primaryKey || 'id'])"
                       :column-count="row.getVisibleCells().length"
-                      :expandable-config="props.data.expandable!"
+                      :expandable-config="props.data?.expandable || { enabled: false, requiredPermissions: [] }"
                       :columns="props.data.columns"
                       :grid-id="getGridIdFromData()"
                       @retry="handleRetryDetailLoad"
@@ -528,7 +528,12 @@ const emit = defineEmits<{
   bulkEdit: [data: { selectedIds: string[], updates: Record<string, any> }]
   bulkArchive: [selectedIds: string[]]
   bulkDelete: [selectedIds: string[]]
-  export: [selectedIds: string[]]
+  export: [data: { 
+    selectedIds: string[], 
+    format: 'csv' | 'pdf',
+    sorting?: any[],
+    visibleColumnIds?: string[]
+  }]
 }>()
 
 const tableContainerRef = ref<HTMLDivElement>()
@@ -1592,8 +1597,23 @@ const handleBulkDelete = (selectedIds: string[]) => {
   emit('bulkDelete', selectedIds)
 }
 
-const handleExport = (selectedIds: string[]) => {
-  emit('export', selectedIds)
+const handleExport = (data: { 
+  selectedIds: string[], 
+  format: 'csv' | 'pdf'
+}) => {
+  // Use the table instance as the source of truth for visibility and sorting
+  const visibleColumnIds = table.getVisibleLeafColumns()
+    .map(col => col.id)
+    .filter(id => id !== 'select' && id !== 'actions' && id !== 'expander' && id !== 'expander-cell');
+
+  const sorting = table.getState().sorting.map(s => ({ id: s.id, desc: s.desc }))
+
+  emit('export', { 
+    selectedIds: data.selectedIds, 
+    format: data.format, 
+    sorting,
+    visibleColumnIds
+  })
 }
 
 // Helper function to get grid ID from data

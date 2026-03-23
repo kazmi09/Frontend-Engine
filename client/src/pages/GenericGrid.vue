@@ -230,13 +230,60 @@ const handleColumnVisibilityChanged = (visibility: Record<string, boolean>) => {
 const handleBulkEdit = async (data: { selectedIds: string[], updates: Record<string, any> }) => {
   try {
     await gridApi.value.bulkEdit(data.selectedIds, data.updates)
+    
+    // Perform bulk optimistic update in the cache
+    const queryKeys = [`${gridId.value}_infinite`]
+    const baseIds = data.selectedIds.map(id => String(id).split('-')[0])
+    
+    queryKeys.forEach(key => {
+      const queries = queryClient.getQueryCache().findAll({ 
+        predicate: (query) => (query.queryKey as string[])[0] === key 
+      })
+      
+      queries.forEach((query) => {
+        const previousData = query.state.data as any
+        if (!previousData) return
+
+        if (previousData.pages) {
+          // Infinite query
+          queryClient.setQueryData(query.queryKey, {
+            ...previousData,
+            pages: previousData.pages.map((page: any) => ({
+              ...page,
+              rows: page.rows.map((row: any) => {
+                const rowBaseId = String(row.id).split('-')[0]
+                if (baseIds.includes(rowBaseId)) {
+                  return { ...row, ...data.updates }
+                }
+                return row
+              })
+            }))
+          })
+        } else if (previousData.rows) {
+          // Regular query
+          queryClient.setQueryData(query.queryKey, {
+            ...previousData,
+            rows: previousData.rows.map((row: any) => {
+              const rowBaseId = String(row.id).split('-')[0]
+              if (baseIds.includes(rowBaseId)) {
+                return { ...row, ...data.updates }
+              }
+              return row
+            })
+          })
+        }
+      })
+    })
+
     $q.notify({
       type: 'positive',
       message: `Successfully updated ${data.selectedIds.length} ${displayNamePlural.value}`,
       position: 'top'
     })
+    
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
+    // Still invalidate to eventually sync with server, but optimistic state is now held
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_infinite`] })
   } catch (error: any) {
     $q.notify({
       type: 'negative',
@@ -255,7 +302,7 @@ const handleBulkArchive = async (selectedIds: string[]) => {
       position: 'top'
     })
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_infinite`] })
   } catch (error: any) {
     $q.notify({
       type: 'negative',
@@ -274,7 +321,7 @@ const handleBulkDelete = async (selectedIds: string[]) => {
       position: 'top'
     })
     gridStore.setRowSelection({})
-    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_generic`] })
+    queryClient.invalidateQueries({ queryKey: [`${gridId.value}_infinite`] })
   } catch (error: any) {
     $q.notify({
       type: 'negative',
@@ -284,9 +331,15 @@ const handleBulkDelete = async (selectedIds: string[]) => {
   }
 }
 
-const handleExport = async (selectedIds: string[]) => {
+const handleExport = async (data: { 
+  selectedIds: string[], 
+  format: 'csv' | 'pdf',
+  sorting?: any[],
+  visibleColumnIds?: string[]
+}) => {
   try {
-    await gridApi.value.exportSelected(selectedIds)
+    const { selectedIds, format, sorting, visibleColumnIds } = data
+    await gridApi.value.exportSelected(selectedIds, format, sorting, visibleColumnIds)
     $q.notify({
       type: 'positive',
       message: `Successfully exported ${selectedIds.length} ${displayNamePlural.value}`,

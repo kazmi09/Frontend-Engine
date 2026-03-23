@@ -40,15 +40,31 @@
             :loading="actionLoading['edit']"
           />
           
-          <q-btn
+          <q-btn-dropdown
             outline
+            dense
             size="sm"
             icon="download"
             label="Export"
             color="positive"
-            @click="exportSelected"
             :loading="actionLoading['export']"
-          />
+          >
+            <q-list dense>
+              <q-item clickable v-close-popup @click="exportSelected('csv')">
+                <q-item-section avatar>
+                  <q-icon name="description" color="positive" size="xs" />
+                </q-item-section>
+                <q-item-section>Export as CSV</q-item-section>
+              </q-item>
+              
+              <q-item clickable v-close-popup @click="exportSelected('pdf')">
+                <q-item-section avatar>
+                  <q-icon name="picture_as_pdf" color="negative" size="xs" />
+                </q-item-section>
+                <q-item-section>Export as PDF</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
           
           <q-btn
             outline
@@ -126,12 +142,17 @@ const emit = defineEmits<{
   bulkEdit: [data: { selectedIds: string[], updates: Record<string, any> }]
   bulkArchive: [selectedIds: string[]]
   bulkDelete: [selectedIds: string[]]
-  export: [selectedIds: string[]]
+  export: [data: { 
+    selectedIds: string[], 
+    format: 'csv' | 'pdf',
+    sorting?: any[],
+    visibleColumnIds?: string[]
+  }]
   customAction: [data: { actionId: string, selectedIds: string[], action: any }]
 }>()
 
 const gridStore = useGridStore()
-const { rowSelection } = storeToRefs(gridStore)
+const { rowSelection, sorting, columnVisibility, columnOrder } = storeToRefs(gridStore)
 
 // Loading states - track per action
 const actionLoading = ref<Record<string, boolean>>({})
@@ -178,10 +199,30 @@ const handleBulkEdit = async (updates: Record<string, any>) => {
   }
 }
 
-const exportSelected = async () => {
+const exportSelected = async (format: 'csv' | 'pdf' = 'csv') => {
   actionLoading.value['export'] = true
   try {
-    emit('export', selectedIds.value)
+    // Determine which columns to export and in what order
+    // Start with columnOrder if it exists, otherwise use props.columns
+    let order = columnOrder.value && columnOrder.value.length > 0 
+      ? columnOrder.value 
+      : props.columns.map(c => c.id)
+    
+    // Filter out internal columns like select/expander and hidden columns
+    const visibleColumnIds = order.filter(id => {
+      // Must be a real data column from props.columns
+      const isDataColumn = props.columns.some(c => c.id === id)
+      // Must not be explicitly hidden
+      const isVisible = columnVisibility.value[id] !== false
+      return isDataColumn && isVisible
+    })
+
+    emit('export', { 
+      selectedIds: selectedIds.value, 
+      format,
+      sorting: sorting.value,
+      visibleColumnIds
+    })
   } finally {
     actionLoading.value['export'] = false
   }

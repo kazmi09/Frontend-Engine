@@ -82,11 +82,11 @@ export class GenericGridService {
     return this.queryBuilder.bulkArchive(selectedIds)
   }
 
-  async exportData(selectedIds: string[]) {
+  async exportData(selectedIds: string[], format: 'csv' | 'pdf' = 'csv', sorting?: any[], visibleColumnIds?: string[]) {
     if (!this.config.bulkActions?.enabled || !this.config.bulkActions.actions.export) {
       throw new Error('Export is not enabled for this grid')
     }
-    return this.queryBuilder.exportData(selectedIds)
+    return this.queryBuilder.exportData(selectedIds, format, sorting, visibleColumnIds)
   }
 
   getConfig(): GridConfig {

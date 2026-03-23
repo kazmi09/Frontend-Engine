@@ -51,13 +51,16 @@ export function useGridUpdate(gridId: string) {
           if (previousData) {
             previousDataMap.set(query.queryKey, previousData);
             
+            // Extract the base primary key from the provided rowId (e.g., "1-0" -> "1")
+            const baseRowId = String(rowId).split('-')[0]
+            
             // Handle regular DataResult
             if ((previousData as any).rows) {
               const dataResult = previousData as DataResult;
               queryClient.setQueryData<DataResult>(query.queryKey, {
                 ...dataResult,
                 rows: dataResult.rows.map((row) =>
-                  row.id === rowId ? { ...row, [columnId]: value } : row
+                  String(row.id).split('-')[0] === baseRowId ? { ...row, [columnId]: value } : row
                 ),
               });
             }
@@ -69,7 +72,7 @@ export function useGridUpdate(gridId: string) {
                 pages: infiniteData.pages.map((page: DataResult) => ({
                   ...page,
                   rows: page.rows.map((row: any) =>
-                    row.id === rowId ? { ...row, [columnId]: value } : row
+                    String(row.id).split('-')[0] === baseRowId ? { ...row, [columnId]: value } : row
                   ),
                 })),
               });
