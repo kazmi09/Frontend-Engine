@@ -1,0 +1,12 @@
+﻿543: const visibleRowRange = ref({
+888: const updateVisibleRowRange = () => {
+910:       if (newRange.first !== visibleRowRange.value.first || newRange.last !== visibleRowRange.value.last) {
+911:         visibleRowRange.value = newRange
+923:       updateVisibleRowRange()
+929:         updateVisibleRowRange()
+945:         updateVisibleRowRange()
+1000:   updateVisibleRowRange()
+1006:     updateVisibleRowRange()
+1124:       const firstVisibleId = visibleRowRange.value.first
+1156:     const firstVisibleId = visibleRowRange.value.first
+1175:     const lastVisibleId = visibleRowRange.value.last

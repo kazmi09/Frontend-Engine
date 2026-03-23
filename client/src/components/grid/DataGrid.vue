@@ -360,7 +360,7 @@
                     <!-- Expander Cell -->
                     <ExpanderCell
                       v-if="cell.column.id === 'expander'"
-                      :row-id="row.original.id"
+                      :row-id="String(row.original[props.data?.primaryKey || 'id'])"
                       :can-expand="canExpandRow(row)"
                       @toggle="handleToggleExpansion"
                     />
@@ -377,7 +377,7 @@
                     <EditableCell
                       v-else
                       :value="row.original[cell.column.id]"
-                      :row-id="row.original.id"
+                      :row-id="String(row.original[props.data?.primaryKey || 'id'])"
                       :column="getColumnConfig(cell.column.id)"
                       :width="cell.column.getSize()"
                       :grid-id="gridId"
@@ -391,7 +391,7 @@
                   <td :colspan="row.getVisibleCells().length" class="tw:p-0">
                     <DetailPanel
                       :row="row.original"
-                      :row-id="row.original.id"
+                      :row-id="String(row.original[props.data?.primaryKey || 'id'])"
                       :column-count="row.getVisibleCells().length"
                       :expandable-config="props.data.expandable!"
                       :columns="props.data.columns"
@@ -474,7 +474,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch, watchEffect } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
@@ -1059,11 +1059,17 @@ const initializeComposables = () => {
   })
   
   // Sync reactive refs
-  isDragging.value = columnReorderingComposable.isDragging.value
-  draggedColumnId.value = columnReorderingComposable.draggedColumnId.value
-  dropIndicatorPosition.value = columnReorderingComposable.dropIndicatorPosition.value
-  isResizing.value = columnResizingComposable.isResizing.value
-  resizingColumnId.value = columnResizingComposable.resizingColumnId.value
+  watchEffect(() => {
+    if (columnReorderingComposable) {
+      isDragging.value = columnReorderingComposable.isDragging.value
+      draggedColumnId.value = columnReorderingComposable.draggedColumnId.value
+      dropIndicatorPosition.value = columnReorderingComposable.dropIndicatorPosition.value
+    }
+    if (columnResizingComposable) {
+      isResizing.value = columnResizingComposable.isResizing.value
+      resizingColumnId.value = columnResizingComposable.resizingColumnId.value
+    }
+  })
 }
 
 // Handlers that delegate to composables
@@ -1116,7 +1122,7 @@ const currentVirtualPage = computed({
     if (props.hasNextPage || props.isFetchingNext) {
       // Calculate based on first visible row
       const firstVisibleId = visibleRowRange.value.first
-      if (!firstVisibleId || !props.data?.rows) {
+      if (firstVisibleId === '' || !props.data?.rows) {
         return 1
       }
       
@@ -1148,7 +1154,7 @@ const startRow = computed(() => {
   if (props.hasNextPage || props.isFetchingNext) {
     // Infinite scroll mode: calculate based on first visible row
     const firstVisibleId = visibleRowRange.value.first
-    if (!firstVisibleId) return 1
+    if (firstVisibleId === '') return 1
     
     // Find the index of the first visible row in the loaded data
     const firstVisibleIndex = props.data?.rows?.findIndex(row => {
@@ -1167,7 +1173,7 @@ const endRow = computed(() => {
   if (props.hasNextPage || props.isFetchingNext) {
     // Infinite scroll mode: calculate based on last visible row
     const lastVisibleId = visibleRowRange.value.last
-    if (!lastVisibleId) return loadedRows.value
+    if (lastVisibleId === '') return loadedRows.value
     
     // Find the index of the last visible row in the loaded data
     const lastVisibleIndex = props.data?.rows?.findIndex(row => {
@@ -1311,7 +1317,7 @@ const handleToggleExpansion = (rowId: string) => {
   // CRITICAL FIX: Exclude group rows from the search. TanStack Table assigns the original data
   // of the first child leaf to the synthetic group row header. Otherwise, clicking the first child
   // would find the group header row and collapse it instead of opening the child's detail panel!
-  const targetRow = tableRows.find(r => r.original?.id === rowId && !r.getIsGrouped?.())
+  const targetRow = tableRows.find(r => String(r.original?.[props.data?.primaryKey || 'id']) === rowId && !r.getIsGrouped?.())
   
   if (targetRow) {
     console.log('Found row in TanStack Table, current expanded state:', targetRow.getIsExpanded?.())
@@ -1344,7 +1350,7 @@ const handleRetryDetailLoad = async (rowId: string) => {
   
   gridStore.setDetailPanelLoading(rowId, true)
   try {
-    const row = props.data.rows.find(r => r.id === rowId)
+    const row = props.data.rows.find(r => String(r[props.data?.primaryKey || 'id']) === rowId)
     if (row) {
       const data = await props.data.expandable.lazyLoad(row, rowId)
       gridStore.setDetailPanelData(rowId, data)
@@ -1534,7 +1540,7 @@ onMounted(() => {
 // Cleanup expanded rows when data changes
 watch(() => props.data?.rows, (newRows) => {
   if (newRows) {
-    const validRowIds = newRows.map(r => r.id)
+    const validRowIds = newRows.map(r => String(r[props.data?.primaryKey || 'id']))
     // Add group IDs (which typically contain ':') so they aren't accidentally wiped out
     const validAndGroupIds = [...validRowIds, ...Object.keys(expandedRows.value).filter(id => id.includes(':'))]
     gridStore.cleanupExpandedRows(validAndGroupIds)
@@ -1544,7 +1550,7 @@ watch(() => props.data?.rows, (newRows) => {
 // Cleanup expanded rows when page changes
 watch(pageIndex, () => {
   if (props.data?.rows) {
-    const validRowIds = props.data.rows.map(r => r.id)
+    const validRowIds = props.data.rows.map(r => String(r[props.data?.primaryKey || 'id']))
     const validAndGroupIds = [...validRowIds, ...Object.keys(expandedRows.value).filter(id => id.includes(':'))]
     gridStore.cleanupExpandedRows(validAndGroupIds)
   }
