@@ -117,6 +117,10 @@ export interface GridState {
   sorting: { id: string; desc: boolean }[];
   grouping: string[]; // Fields currently being grouped by
   groupExpanded: Record<string, boolean>; // Track which groups are expanded
+  rowPinning: {
+    top?: string[];
+    bottom?: string[];
+  };
 }
 
 export interface FilterState {

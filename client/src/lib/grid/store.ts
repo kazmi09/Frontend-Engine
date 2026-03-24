@@ -12,6 +12,7 @@ const initialState: GridState = {
   sorting: [],
   grouping: [],
   groupExpanded: {},
+  rowPinning: { top: [], bottom: [] },
 }
 
 export const useGridStore = defineStore('grid', () => {
@@ -21,6 +22,7 @@ export const useGridStore = defineStore('grid', () => {
   const columnPinning = ref<ColumnPinningState>(initialState.columnPinning)
   const columnSizing = ref<ColumnSizingState>(initialState.columnSizing)
   const sorting = ref<SortingState>(initialState.sorting)
+  const rowPinning = ref<import("@tanstack/vue-table").RowPinningState>(initialState.rowPinning)
   
   // Pagination
   const pageIndex = ref(0)
@@ -132,6 +134,14 @@ export const useGridStore = defineStore('grid', () => {
       rowSelection.value = updaterOrValue(rowSelection.value)
     } else {
       rowSelection.value = updaterOrValue
+    }
+  }
+  
+  const setRowPinning: OnChangeFn<import("@tanstack/vue-table").RowPinningState> = (updaterOrValue) => {
+    if (typeof updaterOrValue === 'function') {
+      rowPinning.value = updaterOrValue(rowPinning.value)
+    } else {
+      rowPinning.value = updaterOrValue
     }
   }
   
@@ -344,6 +354,7 @@ export const useGridStore = defineStore('grid', () => {
     filterBy,
     filters,
     columnFilters,
+    rowPinning,
     
     // Computed
     hasFilters,
@@ -370,6 +381,7 @@ export const useGridStore = defineStore('grid', () => {
     setColumnFilter,
     removeColumnFilter,
     clearAllColumnFilters,
+    setRowPinning,
     
     // Expansion state
     expandedRows,

@@ -71,17 +71,21 @@
       </div>
       
       <!-- Data Table wrapped in q-markup-table for consistent styling -->
-      <q-markup-table v-else flat bordered dense class="grid-table-wrapper" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px` }">
-        <table class="tw:border-collapse full-width" :style="{ width: '100%' }" :key="tableKey">
+      <q-markup-table v-else flat bordered dense class="grid-table-wrapper" :style="{ width: `${tableWidth}px`, minWidth: `${tableWidth}px`, overflow: 'visible' }">
+        <table class="full-width" :style="{ width: '100%' }" :key="tableKey">
         <!-- Header -->
         <thead class="tw:sticky tw:top-0 tw:z-10 bg-grey-2">
           <tr v-for="headerGroup in (table?.getHeaderGroups?.() || [])" :key="headerGroup.id">
             <th
               v-for="header in headerGroup.headers"
               :key="header.id"
-              :style="{ width: `${header.getSize()}px` }"
+              :style="[
+                { width: `${header.getSize()}px` },
+                getColumnStickyStyle(header.column.id)
+              ]"
               :class="[
-                'tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-left tw:text-xs tw:font-medium tw:text-gray-500 tw:uppercase tw:tracking-wider tw:relative',
+                'tw:border-b tw:border-gray-200 tw:px-2 tw:py-1.5 tw:text-left tw:text-xs tw:font-medium tw:text-gray-500 tw:uppercase tw:tracking-wider tw:relative tw:sticky tw:top-0 tw:z-40 tw:bg-gray-50',
+                getColumnStickyClass(header.column.id),
                 {
                   'tw:cursor-move': header.id !== 'select' && header.id !== 'expander',
                   'col-dragging': isDragging && draggedColumnId === header.id,
@@ -169,8 +173,14 @@
             <th
               v-for="header in (table?.getHeaderGroups?.()[0]?.headers || [])"
               :key="`filter-${header.id}`"
-              :style="{ width: `${header.getSize()}px` }"
-              class="tw:border-b tw:border-gray-200 tw:px-1 tw:py-1 tw:bg-gray-50"
+              :style="[
+                { width: `${header.getSize()}px`, top: '40px' },
+                getColumnStickyStyle(header.column.id)
+              ]"
+              :class="[
+                'tw:border-b tw:border-gray-200 tw:px-1 tw:py-1 tw:bg-gray-50 tw:sticky tw:top-[40px] tw:z-40',
+                getColumnStickyClass(header.column.id)
+              ]"
             >
               <!-- No filter for special columns -->
               <template v-if="header.id === 'select' || header.id === 'expander'">
@@ -228,6 +238,57 @@
 
         <!-- Body with Virtual Scrolling -->
         <tbody class="tw:bg-white tw:divide-y tw:divide-gray-200">
+          <!-- Pinned Top Rows -->
+          <tr 
+            v-for="(row, index) in table.getTopRows()" 
+            :key="`pinned-top-${row.id}`"
+            class="sticky-row-top bg-blue-50 dark:bg-blue-900/20"
+            :style="{ top: `${80 + (index * 40)}px` }"
+          >
+            <td
+              v-for="(cell, cellIndex) in row.getVisibleCells()"
+              :key="cell.id"
+              :style="[
+                { 
+                  width: `${cell.column.getSize()}px`, 
+                  minWidth: `${cell.column.getSize()}px`, 
+                  maxWidth: `${cell.column.getSize()}px`,
+                  paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
+                },
+                getColumnStickyStyle(cell.column)
+              ]"
+              class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1 tw:text-sm tw:overflow-hidden bg-white dark:bg-dark"
+              :class="getColumnStickyClass(cell.column)"
+            >
+              <!-- Expander Cell -->
+              <ExpanderCell
+                v-if="cell.column.id === 'expander'"
+                :row-id="row.id"
+                :can-expand="row.getCanExpand()"
+                @toggle="handleToggleExpansion"
+              />
+              
+              <!-- Selection Cell -->
+              <template v-else-if="cell.column.id === 'select'">
+                <q-checkbox
+                  :model-value="row.getIsSelected()"
+                  @update:model-value="(value) => row.toggleSelected(value)"
+                />
+              </template>
+              
+              <!-- Regular Cell -->
+              <EditableCell
+                v-else
+                :value="row.original[cell.column.id]"
+                :row-id="row.id"
+                :column="getColumnConfig(cell.column.id)"
+                :width="cell.column.getSize()"
+                :grid-id="gridId"
+                :active-role="props.activeRole"
+              />
+            </td>
+          </tr>
+
           <!-- Top spacer -->
           <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
             <td :colspan="columns.length" :style="{ height: `${rowVirtualizer.getVirtualItems()[0]?.start || 0}px`, padding: 0, border: 'none' }"></td>
@@ -354,13 +415,19 @@
                   <td
                     v-for="(cell, cellIndex) in (row?.getVisibleCells?.() || [])"
                     :key="cell.id"
-                    :style="{ 
-                      width: `${cell.column.getSize()}px`, 
-                      minWidth: `${cell.column.getSize()}px`, 
-                      maxWidth: `${cell.column.getSize()}px`,
-                      paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
-                    }"
-                    class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1 tw:text-sm tw:overflow-hidden"
+                    :style="[
+                      { 
+                        width: `${cell.column.getSize()}px`, 
+                        minWidth: `${cell.column.getSize()}px`, 
+                        maxWidth: `${cell.column.getSize()}px`,
+                        paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
+                      },
+                      getColumnStickyStyle(cell.column.id)
+                    ]"
+                    :class="[
+                      'tw:border-b tw:border-gray-200 tw:px-2 tw:py-1 tw:text-sm tw:overflow-hidden bg-white dark:bg-dark',
+                      getColumnStickyClass(cell.column.id)
+                    ]"
                   >
                     <!-- Expander Cell -->
                     <ExpanderCell
@@ -415,6 +482,57 @@
           <!-- Bottom spacer -->
           <tr v-if="rowVirtualizer.getVirtualItems().length > 0">
             <td :colspan="columns.length" :style="{ height: `${rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0)}px`, padding: 0, border: 'none' }"></td>
+          </tr>
+
+          <!-- Pinned Bottom Rows -->
+          <tr 
+            v-for="(row, index) in table.getBottomRows()" 
+            :key="`pinned-bottom-${row.id}`"
+            class="sticky-row-bottom bg-blue-50 dark:bg-blue-900/20"
+            :style="{ bottom: `${(table.getBottomRows().length - 1 - index) * 40}px` }"
+          >
+            <td
+              v-for="(cell, cellIndex) in row.getVisibleCells()"
+              :key="cell.id"
+              :style="[
+                { 
+                  width: `${cell.column.getSize()}px`, 
+                  minWidth: `${cell.column.getSize()}px`, 
+                  maxWidth: `${cell.column.getSize()}px`,
+                  paddingLeft: getCellPaddingLeft(cell, cellIndex, row)
+                },
+                getColumnStickyStyle(cell.column)
+              ]"
+              class="tw:border-b tw:border-gray-200 tw:px-2 tw:py-1 tw:text-sm tw:overflow-hidden bg-white dark:bg-dark"
+              :class="getColumnStickyClass(cell.column)"
+            >
+              <!-- Expander Cell -->
+              <ExpanderCell
+                v-if="cell.column.id === 'expander'"
+                :row-id="row.id"
+                :can-expand="row.getCanExpand()"
+                @toggle="handleToggleExpansion"
+              />
+              
+              <!-- Selection Cell -->
+              <template v-else-if="cell.column.id === 'select'">
+                <q-checkbox
+                  :model-value="row.getIsSelected()"
+                  @update:model-value="(value) => row.toggleSelected(value)"
+                />
+              </template>
+              
+              <!-- Regular Cell -->
+              <EditableCell
+                v-else
+                :value="row.original[cell.column.id]"
+                :row-id="row.id"
+                :column="getColumnConfig(cell.column.id)"
+                :width="cell.column.getSize()"
+                :grid-id="gridId"
+                :active-role="props.activeRole"
+              />
+            </td>
           </tr>
         </tbody>
       </table>
@@ -478,7 +596,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, onMounted, watch, watchEffect } from 'vue'
+import { computed, ref, shallowRef, onMounted, watch, watchEffect, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import {
@@ -558,6 +676,10 @@ const visibleRowRange = ref({
   lastIndex: -1
 })
 
+// Scroll anchor: row-id to restore after sort / filter
+const _anchorRowId = ref<string | null>(null)
+const _pendingRestore = ref(false)
+
 // Use storeToRefs to make store properties reactive
 const { 
   columnVisibility,
@@ -572,7 +694,8 @@ const {
   grouping,
   groupExpanded,
   columnFilters,
-  tanstackColumnFilters
+  tanstackColumnFilters,
+  rowPinning
 } = storeToRefs(gridStore)
 
 const { user } = storeToRefs(authStore)
@@ -757,6 +880,9 @@ const table = useVueTable({
     get expanded() {
       return expandedRows.value
     },
+    get rowPinning() { 
+      return rowPinning.value 
+    },
     get pagination() {
       return {
         pageIndex: pageIndex.value,
@@ -764,6 +890,7 @@ const table = useVueTable({
       }
     },
   },
+  onRowPinningChange: gridStore.setRowPinning,
   onColumnVisibilityChange: (updater) => {
     const newVisibility = typeof updater === 'function' ? updater(columnVisibility.value) : updater
     console.log('[DataGrid] Column visibility changed:', newVisibility)
@@ -1039,6 +1166,13 @@ watch(() => props.data?.rows, () => {
     updateVisibleRowRange()
   }, 100)
 }, { immediate: true })
+
+// Restore scroll anchor after sort / filter re-renders the row model
+watch(tableRows, () => {
+  if (!_pendingRestore.value) return
+  // Give the virtualizer one tick to recalculate row positions
+  nextTick(() => restoreScrollAnchor())
+})
 
 // Force table re-render when state changes
 const tableKey = computed(() => {
@@ -1407,6 +1541,38 @@ const handleRetryDetailLoad = async (rowId: string) => {
   }
 }
 
+// ── Scroll-anchor helpers ────────────────────────────────────────────────
+// Call this BEFORE mutating sort/filter state to record which row is on top.
+const captureScrollAnchor = () => {
+  const firstId = visibleRowRange.value.first
+  _anchorRowId.value = firstId !== '' ? firstId : null
+  _pendingRestore.value = true
+}
+
+// Called automatically by the tableRows watcher once the DOM has settled.
+const restoreScrollAnchor = () => {
+  if (!_pendingRestore.value) return
+  _pendingRestore.value = false
+
+  const anchorId = _anchorRowId.value
+  const primaryKey = props.data?.primaryKey || 'id'
+  const rows = table.getRowModel().rows
+
+  if (anchorId) {
+    const targetIndex = rows.findIndex(
+      r => String(r.original[primaryKey]) === anchorId
+    )
+    if (targetIndex >= 0) {
+      rowVirtualizer.value?.scrollToIndex(targetIndex, { align: 'start' })
+      return
+    }
+  }
+
+  // Anchor not found (filtered out) or was never set → scroll to top
+  tableContainerRef.value?.scrollTo({ top: 0 })
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 // Sorting
 const getSortButtonClass = (columnId: string, desc: boolean) => {
   const sortState = sorting.value.find(s => s.id === columnId)
@@ -1423,11 +1589,13 @@ const getSortPriority = (columnId: string): number => {
 }
 
 const removeSort = (columnId: string) => {
+  captureScrollAnchor()
   const newSorting = sorting.value.filter(s => s.id !== columnId)
   gridStore.setSorting(newSorting)
 }
 
 const handleSort = (columnId: string, targetDesc: boolean, event?: MouseEvent) => {
+  captureScrollAnchor()
   const isMultiSort = event?.shiftKey || false
   const currentSorting = [...sorting.value]
   const existingIndex = currentSorting.findIndex(s => s.id === columnId)
@@ -1469,6 +1637,7 @@ const handleInlineFilter = (columnId: string, value: any, debounceMs = 300) => {
   }
   
   filterDebounceTimers.value[columnId] = setTimeout(() => {
+    captureScrollAnchor()
     if (value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
       gridStore.removeColumnFilter(columnId)
     } else {
@@ -1479,6 +1648,7 @@ const handleInlineFilter = (columnId: string, value: any, debounceMs = 300) => {
 
 // Immediate filter for select dropdowns (no debounce needed)
 const handleSelectFilter = (columnId: string, value: any) => {
+  captureScrollAnchor()
   if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
     gridStore.removeColumnFilter(columnId)
   } else {
@@ -1500,6 +1670,47 @@ const startResize = (columnId: string, event: MouseEvent) => {
 const handleColumnDoubleClick = (columnId: string) => {
   composableDoubleClick(columnId)
 }
+
+// Sticky positioning helpers
+const getPinnedLeftOffset = (columnId: string) => {
+  if (!table) return 0
+  const visibleColumns = table.getVisibleLeafColumns()
+  if (!visibleColumns.length) return 0
+  const index = visibleColumns.findIndex(c => c.id === columnId)
+  if (index <= 0) return 0
+  
+  let offset = 0
+  for (let i = 0; i < index; i++) {
+    const col = visibleColumns[i]
+    if (col.getIsPinned() === 'left') {
+      offset += col.getSize()
+    }
+  }
+  return offset
+}
+
+const getColumnStickyClass = (column: any) => {
+  if (!column) return ''
+  // Support both ID string and Column object
+  const colObj = typeof column === 'string' ? table.getColumn(column) : column
+  if (colObj?.getIsPinned() === 'left') {
+    return 'sticky-column'
+  }
+  return ''
+}
+
+const getColumnStickyStyle = (column: any) => {
+  if (!column) return {}
+  const colObj = typeof column === 'string' ? table.getColumn(column) : column
+  if (colObj?.getIsPinned() === 'left') {
+    return {
+      left: `${getPinnedLeftOffset(colObj.id)}px`
+    }
+  }
+  return {}
+}
+
+
 
 // Initialize default expanded rows and grid state
 onMounted(() => {
@@ -1528,6 +1739,7 @@ onMounted(() => {
   defaultColumnWidths['expander'] = 50
   defaultColumnVisibility['select'] = true
   defaultColumnVisibility['expander'] = true
+
   
   // Initialize gridStateStore (this will load from localStorage if exists)
   gridStateStore.initializeGrid(gridId.value, {
@@ -1898,12 +2110,66 @@ const handleResetCustomization = (groupColumn: string, groupValue: any) => {
     &:hover
       background-color: #fafafa
 
-.grid-table
+.grid-table-wrapper
+  // Ensure the wrapper doesn't clip sticky headers
+  overflow: visible !important
+  
+  // Fix border collapse for sticky headers to work with borders
   table
-    border-collapse: collapse
+    border-collapse: separate
+    border-spacing: 0
+    
+  :deep(thead)
+    position: sticky
+    top: 0
+    z-index: 40
+    background-color: inherit
     
   th, td
     border-right: 1px solid rgba(0, 0, 0, 0.12)
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12)
+    background-color: inherit // Important for sticky to not be transparent
+    
+  th
+    background-color: #f5f5f5 // Default header background
+    
+  // Support horizontal sticky for pinned columns
+  .sticky-column
+    position: sticky
+    z-index: 10
+    background-color: white !important
+    
+    &.dark-mode
+      background-color: #1d1d1d !important
+
+  // Higher z-index for pinned headers (stays above scrolled headers AND body)
+  th.sticky-column
+    z-index: 50
+    background-color: #f5f5f5 !important
+    
+  // Pinned rows (vertical sticky)
+  .sticky-row-top
+    position: sticky
+    z-index: 30
+    background-color: white !important
+    
+    &.dark-mode
+      background-color: #1d1d1d !important
+
+  .sticky-row-bottom
+    position: sticky
+    z-index: 30
+    background-color: white !important
+    bottom: 0
+    
+    &.dark-mode
+      background-color: #1d1d1d !important
+    
+    // Pinned row headers
+    &.group-header-row
+      z-index: 35
+
+
     
   th:last-child, td:last-child
     border-right: none
@@ -1956,9 +2222,12 @@ th.col-drop-right
 table
   // Let intrinsic column widths determine total table width so the grid
   // can overflow horizontally and be scrolled when there are many columns.
-  table-layout: auto
+  table-layout: fixed // Change to fixed for better height consistency in sticky
   width: max-content
   min-width: 100%
+  // Important for sticky headers to work correctly with parent overflow
+  border-spacing: 0
+
   
   tbody tr
     // Compact row height to match 32px inputs + padding

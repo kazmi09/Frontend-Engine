@@ -46,6 +46,8 @@ onMounted(() => {
 
 <style lang="sass" scoped>
 .clean-input
+  width: 100%
+
   :deep(.q-field__control)
     padding: 0 8px
     min-height: 32px
@@ -53,6 +55,9 @@ onMounted(() => {
     
   :deep(.q-field__native)
     padding: 0
+    font-size: 0.875rem
+    min-height: 32px
+    height: 32px
     
   :deep(.q-field__control:before)
     border: none
